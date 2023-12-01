@@ -20,7 +20,8 @@ fn main() {
     let input = read_to_string(opt.input).expect("input not found");
 
     let result = match (opt.day, opt.part) {
-        (1, 1) => day1::day1part1(&input),
+        (1, 1) => day1::part1(&input),
+        (1, 2) => day1::part2(&input),
         _ => {
             eprintln!("Day {} part {} not found", opt.day, opt.part);
             exit(1);
