@@ -27,6 +27,20 @@ fn last_number_char(input: &str) -> Result<usize> {
         .ok_or_else(|| Day1Error::NoNumberFound.into())
 }
 
+pub fn part1(input: &str) -> String {
+    input
+        .lines()
+        .map(|line| {
+            (
+                first_number_char(line).unwrap(),
+                last_number_char(line).unwrap(),
+            )
+        })
+        .map(|(a, b)| (a * 10) + b)
+        .sum::<usize>()
+        .to_string()
+}
+
 fn each_number(input: &str) -> Vec<usize> {
     let mut v = Vec::new();
     for p in 0..input.len() {
@@ -53,21 +67,7 @@ fn parse_numeric(input: &str) -> IResult<&str, Option<usize>> {
     ))(input)
 }
 
-pub fn part1(input: &str) -> String {
-    input
-        .lines()
-        .map(|line| {
-            (
-                first_number_char(line).unwrap(),
-                last_number_char(line).unwrap(),
-            )
-        })
-        .map(|(a, b)| (a * 10) + b)
-        .sum::<usize>()
-        .to_string()
-}
-
-pub(crate) fn part2(input: &str) -> String {
+pub fn part2(input: &str) -> String {
     input
         .lines()
         .map(|l| each_number(l))
@@ -112,5 +112,10 @@ zoneight234
         assert_eq!(parse_numeric("1"), Ok(((""), Some(1))));
         assert_eq!(parse_numeric("a1"), Ok((("1"), None)));
         assert_eq!(parse_numeric("one2"), Ok((("2"), Some(1))));
+    }
+
+    #[test]
+    fn test_each_number() {
+        assert_eq!(each_number("oneight"), vec![1, 8]);
     }
 }
