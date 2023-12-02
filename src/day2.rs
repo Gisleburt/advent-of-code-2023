@@ -1,6 +1,7 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{digit1, space0};
+use nom::character::complete;
+use nom::character::complete::space0;
 use nom::multi::separated_list1;
 use nom::sequence::tuple;
 use nom::IResult;
@@ -8,16 +9,16 @@ use std::cmp::max;
 
 #[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
 enum Color {
-    Red(usize),
-    Green(usize),
-    Blue(usize),
+    Red(u32),
+    Green(u32),
+    Blue(u32),
 }
 
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 struct Set {
-    red: usize,
-    green: usize,
-    blue: usize,
+    red: u32,
+    green: u32,
+    blue: u32,
 }
 
 impl From<Vec<Color>> for Set {
@@ -35,7 +36,7 @@ impl From<Vec<Color>> for Set {
 }
 
 impl Set {
-    fn from_raw(red: usize, green: usize, blue: usize) -> Self {
+    fn from_raw(red: u32, green: u32, blue: u32) -> Self {
         Self { red, green, blue }
     }
 
@@ -43,19 +44,19 @@ impl Set {
         self.red >= other.red && self.blue >= other.blue && self.green >= other.green
     }
 
-    fn power(&self) -> usize {
+    fn power(&self) -> u32 {
         self.red * self.green * self.blue
     }
 }
 
 #[derive(Default, Debug, Clone)]
 struct Game {
-    number: usize,
+    number: u32,
     sets: Vec<Set>,
 }
 
 impl Game {
-    fn from_raw(number: usize, sets: Vec<Set>) -> Self {
+    fn from_raw(number: u32, sets: Vec<Set>) -> Self {
         Game { number, sets }
     }
 
@@ -78,18 +79,18 @@ impl Game {
 /// assert_eq!(true, true);
 /// ```
 fn parse_red(input: &str) -> IResult<&str, Color> {
-    let (remainder, (red, _, _)) = tuple((digit1, space0, tag("red")))(input)?;
-    Ok((remainder, Color::Red(red.parse().unwrap())))
+    let (remainder, (red, _, _)) = tuple((complete::u32, space0, tag("red")))(input)?;
+    Ok((remainder, Color::Red(red)))
 }
 
 fn parse_green(input: &str) -> IResult<&str, Color> {
-    let (remainder, (green, _, _)) = tuple((digit1, space0, tag("green")))(input)?;
-    Ok((remainder, Color::Green(green.parse().unwrap())))
+    let (remainder, (green, _, _)) = tuple((complete::u32, space0, tag("green")))(input)?;
+    Ok((remainder, Color::Green(green)))
 }
 
 fn parse_blue(input: &str) -> IResult<&str, Color> {
-    let (remainder, (blue, _, _)) = tuple((digit1, space0, tag("blue")))(input)?;
-    Ok((remainder, Color::Blue(blue.parse().unwrap())))
+    let (remainder, (blue, _, _)) = tuple((complete::u32, space0, tag("blue")))(input)?;
+    Ok((remainder, Color::Blue(blue)))
 }
 
 fn parse_color(input: &str) -> IResult<&str, Color> {
@@ -101,15 +102,15 @@ fn parse_set(input: &str) -> IResult<&str, Set> {
     Ok((remainder, colors.into()))
 }
 
-fn parse_game_number(input: &str) -> IResult<&str, usize> {
-    let (remainder, (_, num, _)) = tuple((tag("Game "), digit1, tag(": ")))(input)?;
-    Ok((remainder, num.parse().unwrap()))
+fn parse_game_number(input: &str) -> IResult<&str, u32> {
+    let (remainder, (_, num, _)) = tuple((tag("Game "), complete::u32, tag(": ")))(input)?;
+    Ok((remainder, num))
 }
 
 fn parse_game(input: &str) -> IResult<&str, Game> {
-    let (remainder, (numnber, colors)) =
+    let (remainder, (number, colors)) =
         tuple((parse_game_number, separated_list1(tag("; "), parse_set)))(input)?;
-    Ok((remainder, Game::from_raw(numnber, colors)))
+    Ok((remainder, Game::from_raw(number, colors)))
 }
 
 pub fn part1(input: &str) -> String {
@@ -119,7 +120,7 @@ pub fn part1(input: &str) -> String {
         .map(|line| parse_game(line).unwrap().1)
         .filter(|game| game.is_possible(&test_set))
         .map(|game| game.number)
-        .sum::<usize>()
+        .sum::<u32>()
         .to_string()
 }
 
@@ -129,7 +130,7 @@ pub fn part2(input: &str) -> String {
         .map(|line| parse_game(line).unwrap().1)
         .map(|game| game.min_set())
         .map(|set| set.power())
-        .sum::<usize>()
+        .sum::<u32>()
         .to_string()
 }
 
