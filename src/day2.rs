@@ -4,6 +4,7 @@ use nom::character::complete::{digit1, space0};
 use nom::multi::separated_list1;
 use nom::sequence::tuple;
 use nom::IResult;
+use std::cmp::max;
 
 #[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
 enum Color {
@@ -41,6 +42,10 @@ impl Set {
     fn contains(&self, other: &Self) -> bool {
         self.red >= other.red && self.blue >= other.blue && self.green >= other.green
     }
+
+    fn power(&self) -> usize {
+        self.red * self.green * self.blue
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -56,6 +61,16 @@ impl Game {
 
     fn is_possible(&self, test_set: &Set) -> bool {
         self.sets.iter().all(|game_set| test_set.contains(game_set))
+    }
+
+    fn min_set(&self) -> Set {
+        self.sets.iter().fold(Set::default(), |acc, cur| {
+            Set::from_raw(
+                max(acc.red, cur.red),
+                max(acc.green, cur.green),
+                max(acc.blue, cur.blue),
+            )
+        })
     }
 }
 
@@ -97,13 +112,23 @@ fn parse_game(input: &str) -> IResult<&str, Game> {
     Ok((remainder, Game::from_raw(numnber, colors)))
 }
 
-pub(crate) fn part1(input: &str) -> String {
+pub fn part1(input: &str) -> String {
     let test_set = Set::from_raw(12, 13, 14);
     input
         .lines()
         .map(|line| parse_game(line).unwrap().1)
         .filter(|game| game.is_possible(&test_set))
         .map(|game| game.number)
+        .sum::<usize>()
+        .to_string()
+}
+
+pub fn part2(input: &str) -> String {
+    input
+        .lines()
+        .map(|line| parse_game(line).unwrap().1)
+        .map(|game| game.min_set())
+        .map(|set| set.power())
         .sum::<usize>()
         .to_string()
 }
@@ -175,5 +200,15 @@ Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
 Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
 Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
         assert_eq!(part1(input), "8".to_string());
+    }
+
+    #[test]
+    fn test_part2() {
+        let input = "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
+        assert_eq!(part2(input), "2286".to_string());
     }
 }
