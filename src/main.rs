@@ -1,4 +1,5 @@
 mod day1;
+mod day2;
 
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -22,6 +23,7 @@ fn main() {
     let result = match (opt.day, opt.part) {
         (1, 1) => day1::part1(&input),
         (1, 2) => day1::part2(&input),
+        (2, 1) => day2::part1(&input),
         _ => {
             eprintln!("Day {} part {} not found", opt.day, opt.part);
             exit(1);
