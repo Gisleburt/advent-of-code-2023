@@ -87,7 +87,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_day1part1() {
+    fn test_part1() {
         let input = "1abc2
 pqr3stu8vwx
 a1b2c3d4e5f
@@ -96,7 +96,7 @@ treb7uchet";
     }
 
     #[test]
-    fn test_day1part2() {
+    fn test_part2() {
         let input = "two1nine
 eightwothree
 abcone2threexyz

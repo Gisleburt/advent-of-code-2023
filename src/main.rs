@@ -1,5 +1,6 @@
-mod day1;
-mod day2;
+mod day01;
+mod day02;
+mod day03;
 
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -21,10 +22,12 @@ fn main() {
     let input = read_to_string(opt.input).expect("input not found");
 
     let result = match (opt.day, opt.part) {
-        (1, 1) => day1::part1(&input),
-        (1, 2) => day1::part2(&input),
-        (2, 1) => day2::part1(&input),
-        (2, 2) => day2::part2(&input),
+        (1, 1) => day01::part1(&input),
+        (1, 2) => day01::part2(&input),
+        (2, 1) => day02::part1(&input),
+        (2, 2) => day02::part2(&input),
+        (3, 1) => day03::part1(&input),
+        (3, 2) => day03::part2(&input),
         _ => {
             eprintln!("Day {} part {} not found", opt.day, opt.part);
             exit(1);
