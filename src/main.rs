@@ -30,6 +30,7 @@ fn main() {
         (3, 1) => day03::part1(&input),
         (3, 2) => day03::part2(&input),
         (4, 1) => day04::part1(&input),
+        (4, 2) => day04::part2(&input),
         _ => {
             eprintln!("Day {} part {} not found", opt.day, opt.part);
             exit(1);
