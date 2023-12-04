@@ -6,6 +6,7 @@ mod day04;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::process::exit;
+use std::time::Instant;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -22,6 +23,7 @@ fn main() {
     let opt = Opt::from_args();
     let input = read_to_string(opt.input).expect("input not found");
 
+    let start = Instant::now();
     let result = match (opt.day, opt.part) {
         (1, 1) => day01::part1(&input),
         (1, 2) => day01::part2(&input),
@@ -30,7 +32,7 @@ fn main() {
         (3, 1) => day03::part1(&input),
         (3, 2) => day03::part2(&input),
         (4, 1) => day04::part1(&input),
-        (4, 2) => day04::part2(&input),
+        (4, 2) => day04::part2_alt(&input),
         // (5, 1) => day05::part1(&input),
         // (5, 2) => day05::part2(&input),
         // (6, 1) => day06::part1(&input),
@@ -78,5 +80,13 @@ fn main() {
             exit(1);
         }
     };
-    println!("Answer for day {} part {} is {}", opt.day, opt.part, result)
+    let end = Instant::now();
+    let duration = (end - start);
+    let seconds = duration.as_secs();
+    let sub_millis = duration.subsec_millis();
+    let sub_micros = duration.subsec_micros() - (sub_millis * 1000);
+    let sub_nanos = duration.subsec_nanos() - (sub_millis * 1_000_000) - (sub_micros * 1000);
+    println!("Answer for day {} part {} is:", opt.day, opt.part);
+    println!("{result}");
+    println!("Time taken: {seconds}s {sub_millis}ms {sub_micros}µs {sub_nanos}ns");
 }
