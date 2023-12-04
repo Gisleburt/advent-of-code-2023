@@ -81,11 +81,11 @@ fn main() {
         }
     };
     let end = Instant::now();
-    let duration = (end - start);
+    let duration = end - start;
     let seconds = duration.as_secs();
     let sub_millis = duration.subsec_millis();
     let sub_micros = duration.subsec_micros() - (sub_millis * 1000);
-    let sub_nanos = duration.subsec_nanos() - (sub_millis * 1_000_000) - (sub_micros * 1000);
+    let sub_nanos = (duration.subsec_nanos() - (sub_millis * 1_000_000)) - (sub_micros * 1000);
     println!("Answer for day {} part {} is:", opt.day, opt.part);
     println!("{result}");
     println!("Time taken: {seconds}s {sub_millis}ms {sub_micros}µs {sub_nanos}ns");

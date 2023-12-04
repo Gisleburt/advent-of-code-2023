@@ -108,8 +108,8 @@ pub fn part2_alt(input: &str) -> String {
     let card_counts: Vec<_> = input
         .lines()
         .map(|line| parse_card(line).unwrap().1)
-        .map(|card| CardCounter::from(card))
-        .map(|cc| RefCell::new(cc))
+        .map(CardCounter::from)
+        .map(RefCell::new)
         .collect();
 
     card_counts.iter().for_each(|current_cc| {

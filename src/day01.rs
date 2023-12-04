@@ -15,7 +15,6 @@ fn first_number_char(input: &str) -> Result<usize> {
         .find(|c| c.is_numeric())
         .and_then(|c| (c as usize).checked_sub(48))
         .ok_or_else(|| Day1Error::NoNumberFound.into())
-        .into()
 }
 
 fn last_number_char(input: &str) -> Result<usize> {
@@ -70,11 +69,11 @@ fn parse_numeric(input: &str) -> IResult<&str, Option<usize>> {
 pub fn part2(input: &str) -> String {
     input
         .lines()
-        .map(|l| each_number(l))
+        .map(each_number)
         .map(|v| {
             (
-                v.iter().nth(0).copied().unwrap(),
-                v.iter().rev().nth(0).copied().unwrap(),
+                v.first().copied().unwrap(),
+                v.iter().next_back().copied().unwrap(),
             )
         })
         .map(|(a, b)| (a * 10) + b)
