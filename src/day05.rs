@@ -263,7 +263,7 @@ pub fn part2(input: &str) -> String {
     let (_, almanac) = parse_almanac(input).unwrap();
     let almanacs: Vec<AlmanacV2> = almanac.into();
     almanacs
-        .iter()
+        .par_iter()
         .map(|almanac_v2| almanac_v2.find_nearest_seed_location().1)
         .min()
         .unwrap()
