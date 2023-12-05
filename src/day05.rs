@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{digit1, newline, space1};
@@ -5,6 +6,8 @@ use nom::combinator::value;
 use nom::multi::separated_list1;
 use nom::sequence::{delimited, terminated, tuple};
 use nom::IResult;
+use rayon::prelude::*;
+
 use std::ops::Range;
 
 // Just making one place for all number types I can change later
@@ -36,7 +39,7 @@ enum MapType {
     HumidityToLocation,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 struct RangeMap {
     source: Range<Number>,
     destination: Number,
@@ -103,6 +106,75 @@ impl Almanac {
             .map(|seed| self.humidity_to_location.apply(seed))
             .take();
         (seed, new_location)
+    }
+}
+
+struct AlmanacV2 {
+    seeds: Range<Number>,
+    seed_to_soil: SeedMap,
+    soil_to_fertilizer: SeedMap,
+    fertilizer_to_water: SeedMap,
+    water_to_light: SeedMap,
+    light_to_temperature: SeedMap,
+    temperature_to_humidity: SeedMap,
+    humidity_to_location: SeedMap,
+}
+
+impl AlmanacV2 {
+    fn find_seed_location(&self, seed: Number) -> (Number, Number) {
+        let new_location = SeedBox(seed)
+            .map(|seed| self.seed_to_soil.apply(seed))
+            .map(|seed| self.soil_to_fertilizer.apply(seed))
+            .map(|seed| self.fertilizer_to_water.apply(seed))
+            .map(|seed| self.water_to_light.apply(seed))
+            .map(|seed| self.light_to_temperature.apply(seed))
+            .map(|seed| self.temperature_to_humidity.apply(seed))
+            .map(|seed| self.humidity_to_location.apply(seed))
+            .take();
+        (seed, new_location)
+    }
+
+    fn find_nearest_seed_location(&self) -> (Number, Number) {
+        self.seeds
+            .clone()
+            .fold(None::<(Number, Number)>, |acc, cur| {
+                let location = self.find_seed_location(cur);
+                if let Some(old) = acc {
+                    if old.1 < location.1 {
+                        Some(old)
+                    } else {
+                        Some(location)
+                    }
+                } else {
+                    Some(location)
+                }
+            })
+            .unwrap()
+    }
+}
+
+impl Into<Vec<AlmanacV2>> for Almanac {
+    fn into(self) -> Vec<AlmanacV2> {
+        self.seeds
+            .iter()
+            .chunks(2)
+            .into_iter()
+            .map(|mut i| {
+                let start = *i.next().unwrap();
+                let size = *i.next().unwrap();
+                start..(start + size)
+            })
+            .map(|seeds| AlmanacV2 {
+                seeds,
+                seed_to_soil: self.seed_to_soil.clone(),
+                soil_to_fertilizer: self.soil_to_fertilizer.clone(),
+                fertilizer_to_water: self.fertilizer_to_water.clone(),
+                water_to_light: self.water_to_light.clone(),
+                light_to_temperature: self.light_to_temperature.clone(),
+                temperature_to_humidity: self.temperature_to_humidity.clone(),
+                humidity_to_location: self.humidity_to_location.clone(),
+            })
+            .collect()
     }
 }
 
@@ -185,21 +257,17 @@ pub fn part1(input: &str) -> String {
         .min()
         .unwrap()
         .to_string()
-    // let initial_location = seeds_mapped[0]; // Just taking the first seed to begin
-    // let r = seeds_mapped.iter().fold(
-    //     initial_location,
-    //     |acc, cur| {
-    //         if cur.1 < acc.1 {
-    //             *cur
-    //         } else {
-    //             acc
-    //         }
-    //     },
-    // );
 }
 
-pub fn part2(_input: &str) -> String {
-    todo!()
+pub fn part2(input: &str) -> String {
+    let (_, almanac) = parse_almanac(input).unwrap();
+    let almanacs: Vec<AlmanacV2> = almanac.into();
+    almanacs
+        .iter()
+        .map(|almanac_v2| almanac_v2.find_nearest_seed_location().1)
+        .min()
+        .unwrap()
+        .to_string()
 }
 
 #[cfg(test)]
@@ -246,8 +314,39 @@ humidity-to-location map:
     #[ignore]
     #[test]
     fn test_part2() {
-        let input = "";
-        assert_eq!(part2(input), "")
+        let input = "seeds: 79 14 55 13
+
+seed-to-soil map:
+50 98 2
+52 50 48
+
+soil-to-fertilizer map:
+0 15 37
+37 52 2
+39 0 15
+
+fertilizer-to-water map:
+49 53 8
+0 11 42
+42 0 7
+57 7 4
+
+water-to-light map:
+88 18 7
+18 25 70
+
+light-to-temperature map:
+45 77 23
+81 45 19
+68 64 13
+
+temperature-to-humidity map:
+0 69 1
+1 0 69
+
+humidity-to-location map:
+60 56 37";
+        assert_eq!(part2(input), "46")
     }
 
     #[test]
@@ -376,5 +475,18 @@ humidity-to-location map:
         // Out of range
         assert!(!range.contains(100));
         assert_eq!(range.apply(100), 100);
+    }
+
+    #[test]
+    fn test_range_overlap() {
+        let range1 = RangeMap::new(10, 100, 5); // 10..15
+        let range2 = RangeMap::new(12, 5, 10); // 12..22
+        let range3 = RangeMap::new(100, 100, 100); // 100..200
+
+        assert!(range1.overlaps(&range2));
+        assert!(range2.overlaps(&range1));
+
+        assert!(!range1.overlaps(&range3));
+        assert!(!range3.overlaps(&range1));
     }
 }
