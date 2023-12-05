@@ -77,8 +77,10 @@ struct Almanac {
     humidity_to_location: SeedMap,
 }
 
+#[derive(Debug, PartialEq)]
 struct SeedsV(Vec<Number>);
 
+#[derive(Debug, PartialEq)]
 struct SeedsR(Range<Number>);
 
 type NumberIterator = dyn Iterator<Item = Number>;
@@ -263,7 +265,6 @@ humidity-to-location map:
         assert_eq!(part1(input), "35")
     }
 
-    #[ignore]
     #[test]
     fn test_part2() {
         let input = "seeds: 79 14 55 13
@@ -339,7 +340,7 @@ humidity-to-location map:
 some other stuff";
         assert_eq!(
             parse_seeds(input),
-            Ok(("some other stuff", vec![79u64, 14, 55, 13]))
+            Ok(("some other stuff", SeedsV(vec![79u64, 14, 55, 13])))
         )
     }
 
@@ -427,18 +428,5 @@ humidity-to-location map:
         // Out of range
         assert!(!range.contains(100));
         assert_eq!(range.apply(100), 100);
-    }
-
-    #[test]
-    fn test_range_overlap() {
-        let range1 = RangeMap::new(10, 100, 5); // 10..15
-        let range2 = RangeMap::new(12, 5, 10); // 12..22
-        let range3 = RangeMap::new(100, 100, 100); // 100..200
-
-        assert!(range1.overlaps(&range2));
-        assert!(range2.overlaps(&range1));
-
-        assert!(!range1.overlaps(&range3));
-        assert!(!range3.overlaps(&range1));
     }
 }
