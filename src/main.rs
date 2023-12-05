@@ -15,7 +15,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 struct Opt {
     #[structopt(parse(from_os_str))]
-    input: PathBuf,
+    input: Option<PathBuf>,
     #[structopt(short = "d", long = "day")]
     day: usize,
     #[structopt(short = "p", long = "part")]
@@ -24,7 +24,11 @@ struct Opt {
 
 fn main() {
     let opt = Opt::from_args();
-    let input = read_to_string(opt.input).expect("input not found");
+    let input_path = opt
+        .input
+        .unwrap_or_else(|| PathBuf::from(format!("inputs/d{:0>2}.txt", opt.day)));
+
+    let input = read_to_string(input_path).expect("input not found");
 
     let start = Instant::now();
     let result = match (opt.day, opt.part) {
