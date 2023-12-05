@@ -34,7 +34,7 @@ fn main() {
         (3, 1) => day03::part1(&input),
         (3, 2) => day03::part2(&input),
         (4, 1) => day04::part1(&input),
-        (4, 2) => day04::part2_alt(&input),
+        (4, 2) => day04::part2(&input),
         (5, 1) => day05::part1(&input),
         (5, 2) => day05::part2(&input),
         (6, 1) => day06::part1(&input),
