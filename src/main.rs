@@ -3,6 +3,7 @@ mod day02;
 mod day03;
 mod day04;
 mod day05;
+mod day05_failed_optimization;
 mod day06;
 mod day07;
 
@@ -42,6 +43,8 @@ fn main() {
         (4, 2) => day04::part2(&input),
         (5, 1) => day05::part1(&input),
         (5, 2) => day05::part2(&input),
+        (105, 1) => day05_failed_optimization::part1(&input),
+        (105, 2) => day05_failed_optimization::part2(&input),
         (6, 1) => day06::part1(&input),
         (6, 2) => day06::part2(&input),
         (7, 1) => day07::part1(&input),
