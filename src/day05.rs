@@ -7,26 +7,10 @@ use nom::multi::separated_list1;
 use nom::sequence::{delimited, terminated, tuple};
 use nom::IResult;
 use rayon::prelude::*;
-
 use std::ops::Range;
 
 // Just making one place for all number types I can change later
 type Number = u64;
-
-struct SeedBox(Number);
-
-impl SeedBox {
-    fn map<F>(self, f: F) -> SeedBox
-    where
-        F: FnOnce(Number) -> Number,
-    {
-        SeedBox(f(self.0))
-    }
-
-    fn take(&self) -> Number {
-        self.0
-    }
-}
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 enum MapType {
@@ -93,17 +77,54 @@ struct Almanac {
     humidity_to_location: SeedMap,
 }
 
-impl Almanac {
-    fn get_seed_location(&self, seed: Number) -> Number {
-        SeedBox(seed)
-            .map(|seed| self.seed_to_soil.apply(seed))
-            .map(|seed| self.soil_to_fertilizer.apply(seed))
-            .map(|seed| self.fertilizer_to_water.apply(seed))
-            .map(|seed| self.water_to_light.apply(seed))
-            .map(|seed| self.light_to_temperature.apply(seed))
-            .map(|seed| self.temperature_to_humidity.apply(seed))
-            .map(|seed| self.humidity_to_location.apply(seed))
-            .take()
+struct SeedsV(Vec<Number>);
+
+struct SeedsR(Range<Number>);
+
+type NumberIterator = dyn Iterator<Item = Number>;
+
+trait Seeds {
+    fn seed_iter(&self) -> Box<NumberIterator>;
+
+    fn nearest_seed_according_to_almanac<'a>(&'a self, almanac: &'a Almanac) -> Number {
+        self.seed_iter()
+            .map(|seed| almanac.seed_to_soil.apply(seed))
+            .map(|seed| almanac.soil_to_fertilizer.apply(seed))
+            .map(|seed| almanac.fertilizer_to_water.apply(seed))
+            .map(|seed| almanac.water_to_light.apply(seed))
+            .map(|seed| almanac.light_to_temperature.apply(seed))
+            .map(|seed| almanac.temperature_to_humidity.apply(seed))
+            .map(|seed| almanac.humidity_to_location.apply(seed))
+            .min()
+            .unwrap()
+    }
+}
+
+impl Seeds for SeedsV {
+    fn seed_iter(&self) -> Box<NumberIterator> {
+        Box::new(self.0.clone().into_iter())
+    }
+}
+
+impl Seeds for SeedsR {
+    fn seed_iter(&self) -> Box<NumberIterator> {
+        Box::new(self.0.clone())
+    }
+}
+
+impl From<SeedsV> for Vec<SeedsR> {
+    fn from(seeds: SeedsV) -> Self {
+        seeds
+            .0
+            .into_iter()
+            .chunks(2)
+            .into_iter()
+            .map(|mut i| {
+                let start = i.next().unwrap();
+                let size = i.next().unwrap();
+                SeedsR(start..(start + size))
+            })
+            .collect()
     }
 }
 
@@ -122,9 +143,13 @@ fn parse_map_type(input: &str) -> IResult<&str, MapType> {
     ))(input)
 }
 
-fn parse_seeds(input: &str) -> IResult<&str, Vec<Number>> {
-    delimited(tag("seeds: "), separated_list1(space1, digit1), newline)(input)
-        .map(|(s, v)| (s, v.into_iter().map(|num| num.parse().unwrap()).collect()))
+fn parse_seeds(input: &str) -> IResult<&str, SeedsV> {
+    let (remainder, seeds) =
+        delimited(tag("seeds: "), separated_list1(space1, digit1), newline)(input)?;
+    Ok((
+        remainder,
+        SeedsV(seeds.into_iter().map(|s| s.parse().unwrap()).collect()),
+    ))
 }
 
 fn parse_range_map(input: &str) -> IResult<&str, RangeMap> {
@@ -148,7 +173,7 @@ fn parse_seed_map(input: &str) -> IResult<&str, SeedMap> {
     Ok((remainder, SeedMap { map_type, ranges }))
 }
 
-fn parse_almanac(input: &str) -> IResult<&str, (Vec<Number>, Almanac)> {
+fn parse_almanac(input: &str) -> IResult<&str, (SeedsV, Almanac)> {
     let (remainder, (seeds, _, maps)) = tuple((
         parse_seeds,
         newline,
@@ -182,30 +207,16 @@ fn parse_almanac(input: &str) -> IResult<&str, (Vec<Number>, Almanac)> {
 pub fn part1(input: &str) -> String {
     let (_, (seeds, almanac)) = parse_almanac(input).unwrap();
     seeds
-        .iter()
-        .copied()
-        .map(|seed| almanac.get_seed_location(seed))
-        .min()
-        .unwrap()
+        .nearest_seed_according_to_almanac(&almanac)
         .to_string()
 }
 
 pub fn part2(input: &str) -> String {
     let (_, (seeds, almanac)) = parse_almanac(input).unwrap();
-    let ranges: Vec<_> = seeds
-        .into_iter()
-        .chunks(2)
-        .into_iter()
-        .map(|mut i| {
-            let start = i.next().unwrap();
-            let size = i.next().unwrap();
-            start..(start + size)
-        })
-        .collect();
 
-    ranges
+    Vec::from(seeds)
         .into_par_iter()
-        .map(|r| r.map(|seed| almanac.get_seed_location(seed)).min().unwrap())
+        .map(|seeds| seeds.nearest_seed_according_to_almanac(&almanac))
         .min()
         .unwrap()
         .to_string()
