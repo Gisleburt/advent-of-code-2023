@@ -84,7 +84,6 @@ impl SeedMap {
 
 #[derive(Debug, PartialEq)]
 struct Almanac {
-    seeds: Vec<Number>,
     seed_to_soil: SeedMap,
     soil_to_fertilizer: SeedMap,
     fertilizer_to_water: SeedMap,
@@ -95,8 +94,8 @@ struct Almanac {
 }
 
 impl Almanac {
-    fn find_seed_location(&self, seed: Number) -> (Number, Number) {
-        let new_location = SeedBox(seed)
+    fn get_seed_location(&self, seed: Number) -> Number {
+        SeedBox(seed)
             .map(|seed| self.seed_to_soil.apply(seed))
             .map(|seed| self.soil_to_fertilizer.apply(seed))
             .map(|seed| self.fertilizer_to_water.apply(seed))
@@ -104,77 +103,7 @@ impl Almanac {
             .map(|seed| self.light_to_temperature.apply(seed))
             .map(|seed| self.temperature_to_humidity.apply(seed))
             .map(|seed| self.humidity_to_location.apply(seed))
-            .take();
-        (seed, new_location)
-    }
-}
-
-struct AlmanacV2 {
-    seeds: Range<Number>,
-    seed_to_soil: SeedMap,
-    soil_to_fertilizer: SeedMap,
-    fertilizer_to_water: SeedMap,
-    water_to_light: SeedMap,
-    light_to_temperature: SeedMap,
-    temperature_to_humidity: SeedMap,
-    humidity_to_location: SeedMap,
-}
-
-impl AlmanacV2 {
-    fn find_seed_location(&self, seed: Number) -> (Number, Number) {
-        let new_location = SeedBox(seed)
-            .map(|seed| self.seed_to_soil.apply(seed))
-            .map(|seed| self.soil_to_fertilizer.apply(seed))
-            .map(|seed| self.fertilizer_to_water.apply(seed))
-            .map(|seed| self.water_to_light.apply(seed))
-            .map(|seed| self.light_to_temperature.apply(seed))
-            .map(|seed| self.temperature_to_humidity.apply(seed))
-            .map(|seed| self.humidity_to_location.apply(seed))
-            .take();
-        (seed, new_location)
-    }
-
-    fn find_nearest_seed_location(&self) -> (Number, Number) {
-        self.seeds
-            .clone()
-            .fold(None::<(Number, Number)>, |acc, cur| {
-                let location = self.find_seed_location(cur);
-                if let Some(old) = acc {
-                    if old.1 < location.1 {
-                        Some(old)
-                    } else {
-                        Some(location)
-                    }
-                } else {
-                    Some(location)
-                }
-            })
-            .unwrap()
-    }
-}
-
-impl Into<Vec<AlmanacV2>> for Almanac {
-    fn into(self) -> Vec<AlmanacV2> {
-        self.seeds
-            .iter()
-            .chunks(2)
-            .into_iter()
-            .map(|mut i| {
-                let start = *i.next().unwrap();
-                let size = *i.next().unwrap();
-                start..(start + size)
-            })
-            .map(|seeds| AlmanacV2 {
-                seeds,
-                seed_to_soil: self.seed_to_soil.clone(),
-                soil_to_fertilizer: self.soil_to_fertilizer.clone(),
-                fertilizer_to_water: self.fertilizer_to_water.clone(),
-                water_to_light: self.water_to_light.clone(),
-                light_to_temperature: self.light_to_temperature.clone(),
-                temperature_to_humidity: self.temperature_to_humidity.clone(),
-                humidity_to_location: self.humidity_to_location.clone(),
-            })
-            .collect()
+            .take()
     }
 }
 
@@ -219,7 +148,7 @@ fn parse_seed_map(input: &str) -> IResult<&str, SeedMap> {
     Ok((remainder, SeedMap { map_type, ranges }))
 }
 
-fn parse_almanac(input: &str) -> IResult<&str, Almanac> {
+fn parse_almanac(input: &str) -> IResult<&str, (Vec<Number>, Almanac)> {
     let (remainder, (seeds, _, maps)) = tuple((
         parse_seeds,
         newline,
@@ -235,36 +164,48 @@ fn parse_almanac(input: &str) -> IResult<&str, Almanac> {
 
     Ok((
         remainder,
-        Almanac {
+        (
             seeds,
-            seed_to_soil: get_map(MapType::SeedToSoil),
-            soil_to_fertilizer: get_map(MapType::SoilToFertilizer),
-            fertilizer_to_water: get_map(MapType::FertilizerToWater),
-            water_to_light: get_map(MapType::WaterToLight),
-            light_to_temperature: get_map(MapType::LightToTemperature),
-            temperature_to_humidity: get_map(MapType::TemperatureToHumidity),
-            humidity_to_location: get_map(MapType::HumidityToLocation),
-        },
+            Almanac {
+                seed_to_soil: get_map(MapType::SeedToSoil),
+                soil_to_fertilizer: get_map(MapType::SoilToFertilizer),
+                fertilizer_to_water: get_map(MapType::FertilizerToWater),
+                water_to_light: get_map(MapType::WaterToLight),
+                light_to_temperature: get_map(MapType::LightToTemperature),
+                temperature_to_humidity: get_map(MapType::TemperatureToHumidity),
+                humidity_to_location: get_map(MapType::HumidityToLocation),
+            },
+        ),
     ))
 }
 
 pub fn part1(input: &str) -> String {
-    let (_, almanac) = parse_almanac(input).unwrap();
-    almanac
-        .seeds
+    let (_, (seeds, almanac)) = parse_almanac(input).unwrap();
+    seeds
         .iter()
-        .map(|seed| almanac.find_seed_location(*seed).1)
+        .copied()
+        .map(|seed| almanac.get_seed_location(seed))
         .min()
         .unwrap()
         .to_string()
 }
 
 pub fn part2(input: &str) -> String {
-    let (_, almanac) = parse_almanac(input).unwrap();
-    let almanacs: Vec<AlmanacV2> = almanac.into();
-    almanacs
-        .par_iter()
-        .map(|almanac_v2| almanac_v2.find_nearest_seed_location().1)
+    let (_, (seeds, almanac)) = parse_almanac(input).unwrap();
+    let ranges: Vec<_> = seeds
+        .into_iter()
+        .chunks(2)
+        .into_iter()
+        .map(|mut i| {
+            let start = i.next().unwrap();
+            let size = i.next().unwrap();
+            start..(start + size)
+        })
+        .collect();
+
+    ranges
+        .into_par_iter()
+        .map(|r| r.map(|seed| almanac.get_seed_location(seed)).min().unwrap())
         .min()
         .unwrap()
         .to_string()
