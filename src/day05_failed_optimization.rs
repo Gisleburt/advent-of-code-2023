@@ -22,6 +22,14 @@ impl Map {
         }
     }
 
+    #[cfg(test)]
+    fn new_raw(start: Number, end: Number, modifier: Number) -> Self {
+        Map {
+            range: start..end,
+            modifier,
+        }
+    }
+
     fn contains(&self, number: Number) -> bool {
         self.range.start <= number && self.range.end > number
     }
@@ -41,14 +49,6 @@ impl Map {
         }
     }
 
-    fn is_contained_within(&self, other: &Map) -> bool {
-        self.range.start >= other.range.start && self.range.end <= other.range.end
-    }
-
-    fn is_contained_within_edges(&self, other: &Map) -> bool {
-        self.range.start > other.range.start && self.range.end < other.range.end
-    }
-
     fn overlaps(&self, other: &Map) -> bool {
         self.range.end > other.range.start && self.range.start < other.range.end
     }
@@ -57,136 +57,90 @@ impl Map {
         self.range.start < other.range.start
     }
 
-    fn overlaps_and_is_first(&self, other: &Map) -> bool {
-        self.overlaps(other) && self.starts_before(other)
+    fn ends_after(&self, other: &Map) -> bool {
+        self.range.end > other.range.end
     }
 
-    fn overlaps_and_is_second(&self, other: &Map) -> bool {
-        self.overlaps(other) && !self.starts_before(other)
+    fn get_before_inside_after(&self, other: &Map) -> (Option<Map>, Map, Option<Map>) {
+        assert!(self.overlaps(other));
+        let modifier = self.modifier;
+        let before = match self.starts_before(other) {
+            true => Some(Map {
+                range: self.range.start..self.range.end.min(other.range.start),
+                modifier,
+            }),
+            false => None,
+        };
+        let inside = Map {
+            range: self.range.start.max(other.range.start)..self.range.end.min(other.range.end),
+            modifier,
+        };
+        let after = match self.ends_after(other) {
+            true => Some(Map {
+                range: self.range.start.max(other.range.end)..self.range.end,
+                modifier,
+            }),
+            false => None,
+        };
+        (before, inside, after)
     }
+}
 
-    /// R1 is container within R2
-    /// ```text
-    ///    [r1]
-    /// + [ r2 ]
-    /// = [ r2 ]
-    /// ```
-    /// _and_
-    /// ```text
-    ///   [ r1 ]
-    /// + [ r2 ]
-    /// = [ r2 ]
-    /// ```
-    /// R2 is fully inside the edges of R1
-    /// ```text
-    ///   [    r1    ]
-    /// +     [r2]
-    /// = [r1][r2][r1]
-    /// ```
-    /// R1 overlaps R2 and is first
-    /// ```text
-    ///   [ r1 ]
-    /// +     [ r2 ]
-    /// = [r1][ r2 ]
-    /// ```
-    /// _and_
-    /// ```text
-    ///   [   r1   ]
-    /// +     [ r2 ]
-    /// = [r1][ r2 ]
-    /// ```
-    /// R1 overlaps R2 and is second
-    /// ```text
-    ///       [ r1 ]
-    /// + [ r2 ]
-    /// = [ r2 ][r1]
-    /// ```
-    /// _and_
-    /// ```text
-    ///   [     r1 ]
-    /// + [ r2 ]
-    /// = [ r2 ][r1]
-    /// ```
-    /// I think ordering might be important here
-    fn combine(self, other: Map) -> Vec<Map> {
-        if self.is_contained_within(&other) {
-            vec![other]
-        } else if other.is_contained_within_edges(&self) {
-            vec![
-                Map {
-                    range: self.range.start..other.range.start,
-                    modifier: self.modifier,
-                },
-                Map {
-                    range: other.range.start..other.range.end,
-                    modifier: other.modifier,
-                },
-                Map {
-                    range: other.range.end..self.range.end,
-                    modifier: self.modifier,
-                },
-            ]
-        } else if self.overlaps_and_is_first(&other) {
-            vec![
-                Map {
-                    range: self.range.start..other.range.start,
-                    modifier: self.modifier,
-                },
-                Map {
-                    range: other.range.start..other.range.end,
-                    modifier: other.modifier,
-                },
-            ]
-        } else if self.overlaps_and_is_second(&other) {
-            vec![
-                Map {
-                    range: other.range.start..other.range.end,
-                    modifier: other.modifier,
-                },
-                Map {
-                    range: other.range.end..self.range.end,
-                    modifier: self.modifier,
-                },
-            ]
-        } else if self.starts_before(&other) {
-            vec![self, other]
-        } else {
-            vec![other, self]
+trait OptionalPush<T> {
+    fn optional_push(&mut self, opt: Option<T>);
+}
+
+impl<T> OptionalPush<T> for Vec<T> {
+    fn optional_push(&mut self, opt: Option<T>) {
+        if let Some(value) = opt {
+            self.push(value)
         }
     }
 }
 
+#[derive(Debug)]
 struct CombinedMap {
     maps: Option<Vec<Map>>,
 }
 
 impl CombinedMap {
     fn new() -> Self {
-        CombinedMap {
-            maps: Some(Vec::with_capacity(0)),
-        }
+        CombinedMap { maps: None }
     }
 
     fn add_map(&mut self, new_map: Map) {
-        let maps = self.maps.take().unwrap(); // Leaves None behind, always put something back
+        let Some(maps) = self.maps.take() else {
+            self.maps = Some(vec![new_map]);
+            return;
+        };
 
-        let new_map_ref = &new_map;
-        let (mut unaffected_maps, mut maps_to_process): (Vec<_>, Vec<_>) = maps
+        let (mut unaffected_maps, maps_to_process): (Vec<_>, Vec<_>) = maps
             .into_iter()
-            .partition(|existing_map| !new_map_ref.overlaps(existing_map));
+            .partition(|existing_map| !&new_map.overlaps(existing_map));
 
-        maps_to_process.reverse();
-        while let Some(map_to_handle) = maps_to_process.pop() {
-            if new_map.overlaps(&map_to_handle) {
-                maps_to_process.extend(map_to_handle.combine(new_map.clone()));
-            } else {
-                unaffected_maps.push(map_to_handle)
-            }
+        let mut map_to_add = Some(new_map);
+        for old_map in maps_to_process.into_iter() {
+            let new_map = map_to_add.take().unwrap();
+            let (new_before, mut new_inside, new_after) = new_map.get_before_inside_after(&old_map);
+            let (old_before, old_inside, old_after) = old_map.get_before_inside_after(&new_map);
+
+            unaffected_maps.optional_push(new_before);
+            unaffected_maps.optional_push(old_before);
+
+            // The middle needs modifying
+            new_inside.modifier += old_inside.modifier;
+            unaffected_maps.push(new_inside);
+
+            // If there's a leftover old map its not being overlapped so check it straight in
+            unaffected_maps.optional_push(old_after);
+            // Leftover new map should replace the "map to add" though
+            map_to_add = new_after;
         }
+        unaffected_maps.optional_push(map_to_add);
 
         unaffected_maps.sort_by_key(|map| map.range.start);
 
-        self.maps = Some(unaffected_maps)
+        self.maps = Some(unaffected_maps);
     }
 
     fn optimise(&mut self) {
@@ -252,9 +206,13 @@ pub fn part1(input: &str) -> String {
             combined.add_map(map);
             combined
         });
+    // dbg!(&combined);
     combined.optimise();
     seeds
         .into_iter()
+        // .inspect(|s| {
+        //     dbg!(s);
+        // })
         .map(|seed| combined.map_position(seed))
         .min()
         .unwrap()
@@ -270,222 +228,146 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_map_combine() {
-        //    [r1]
-        // + [ r2 ]
-        // = [ r2 ]
-        let map1 = Map {
-            range: 2..3,
-            modifier: 1,
-        };
-        let map2 = Map {
-            range: 1..5,
-            modifier: 2,
-        };
+    fn test_combined_map_add_map() {
+        let mut combined = CombinedMap::new();
+
+        let map1 = Map::new_raw(5, 10, 1);
+        combined.add_map(map1);
+        assert_eq!(combined.maps, Some(vec![Map::new_raw(5, 10, 1)]));
+
+        let map2 = Map::new_raw(8, 12, 2);
+        combined.add_map(map2);
         assert_eq!(
-            map1.combine(map2),
-            vec![Map {
-                range: 1..5,
-                modifier: 2
-            }]
+            combined.maps,
+            Some(vec![
+                Map::new_raw(5, 8, 1),
+                Map::new_raw(8, 10, 3),
+                Map::new_raw(10, 12, 2),
+            ])
         );
 
-        //   [ r1 ]
-        // + [ r2 ]
-        // = [ r2 ]
-        let map1 = Map {
-            range: 1..5,
-            modifier: 1,
-        };
-        let map2 = Map {
-            range: 1..5,
-            modifier: 2,
-        };
+        let map3 = Map::new_raw(2, 4, 3);
+        combined.add_map(map3);
         assert_eq!(
-            map1.combine(map2),
-            vec![Map {
-                range: 1..5,
-                modifier: 2
-            }]
+            combined.maps,
+            Some(vec![
+                Map::new_raw(2, 4, 3),
+                Map::new_raw(5, 8, 1),
+                Map::new_raw(8, 10, 3),
+                Map::new_raw(10, 12, 2),
+            ])
         );
 
-        //   [    r1    ]
-        // +     [r2]
-        // = [r1][r2][r1]
-        let map1 = Map {
-            range: 1..12,
-            modifier: 1,
-        };
-        let map2 = Map {
-            range: 5..9,
-            modifier: 2,
-        };
+        let map4 = Map::new_raw(3, 6, 5);
+        combined.add_map(map4);
         assert_eq!(
-            map1.combine(map2),
-            vec![
-                Map {
-                    range: 1..5,
-                    modifier: 1
-                },
-                Map {
-                    range: 5..9,
-                    modifier: 2
-                },
-                Map {
-                    range: 9..12,
-                    modifier: 1
-                },
-            ]
+            combined.maps,
+            Some(vec![
+                Map::new_raw(2, 3, 3),
+                Map::new_raw(3, 4, 8),
+                Map::new_raw(4, 5, 5),
+                Map::new_raw(5, 6, 6),
+                Map::new_raw(6, 8, 1),
+                Map::new_raw(8, 10, 3),
+                Map::new_raw(10, 12, 2),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_combined_map_add_map_no_overlap() {
+        let mut combined = CombinedMap::new();
+
+        let middle = Map::new_raw(5, 10, 1);
+        combined.add_map(middle);
+        assert_eq!(combined.maps, Some(vec![Map::new_raw(5, 10, 1)]));
+
+        let first = Map::new_raw(1, 5, 2);
+        combined.add_map(first.clone());
+        assert_eq!(
+            combined.maps,
+            Some(vec![Map::new_raw(1, 5, 2), Map::new_raw(5, 10, 1)])
         );
 
-        //   [ r1 ]
-        // +     [ r2 ]
-        // = [r1][ r2 ]
-        let map1 = Map {
-            range: 1..5,
-            modifier: 1,
-        };
-        let map2 = Map {
-            range: 4..9,
-            modifier: 2,
-        };
+        let last = Map::new_raw(10, 15, 3);
+        combined.add_map(last.clone());
         assert_eq!(
-            map1.combine(map2),
-            vec![
-                Map {
-                    range: 1..4,
-                    modifier: 1
-                },
-                Map {
-                    range: 4..9,
-                    modifier: 2
-                }
-            ]
+            combined.maps,
+            Some(vec![
+                Map::new_raw(1, 5, 2),
+                Map::new_raw(5, 10, 1),
+                Map::new_raw(10, 15, 3),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_combined_map_add_map_simple_overlap() {
+        let mut combined = CombinedMap::new();
+
+        let middle = Map::new_raw(4, 11, 1);
+        combined.add_map(middle);
+        assert_eq!(combined.maps, Some(vec![Map::new_raw(4, 11, 1)]));
+
+        let first = Map::new_raw(1, 6, 2);
+        combined.add_map(first);
+        assert_eq!(
+            combined.maps,
+            Some(vec![
+                Map::new_raw(1, 4, 2),
+                Map::new_raw(4, 6, 3),
+                Map::new_raw(6, 11, 1)
+            ])
         );
 
-        //   [   r1   ]
-        // +     [ r2 ]
-        // = [r1][ r2 ]
-        let map1 = Map {
-            range: 1..9,
-            modifier: 1,
-        };
-        let map2 = Map {
-            range: 4..9,
-            modifier: 2,
-        };
+        let last = Map::new_raw(9, 15, 3);
+        combined.add_map(last);
         assert_eq!(
-            map1.combine(map2),
-            vec![
-                Map {
-                    range: 1..4,
-                    modifier: 1
-                },
-                Map {
-                    range: 4..9,
-                    modifier: 2
-                }
-            ]
+            combined.maps,
+            Some(vec![
+                Map::new_raw(1, 4, 2),
+                Map::new_raw(4, 6, 3),
+                Map::new_raw(6, 9, 1),
+                Map::new_raw(9, 11, 4),
+                Map::new_raw(11, 15, 3),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_combined_map_add_map_middle_overlap() {
+        let mut combined = CombinedMap::new();
+
+        let first = Map::new_raw(5, 10, 1);
+        combined.add_map(first);
+        assert_eq!(combined.maps, Some(vec![Map::new_raw(5, 10, 1)]));
+
+        let second = Map::new_raw(5, 10, 2);
+        combined.add_map(second);
+        assert_eq!(combined.maps, Some(vec![Map::new_raw(5, 10, 3)]));
+
+        let third = Map::new_raw(1, 15, 3);
+        combined.add_map(third);
+        assert_eq!(
+            combined.maps,
+            Some(vec![
+                Map::new_raw(1, 5, 3),
+                Map::new_raw(5, 10, 6),
+                Map::new_raw(10, 15, 3),
+            ])
         );
 
-        //       [ r1 ]
-        // + [ r2 ]
-        // = [ r2 ][r1]
-        let map1 = Map {
-            range: 4..9,
-            modifier: 1,
-        };
-        let map2 = Map {
-            range: 1..5,
-            modifier: 2,
-        };
+        let fourth = Map::new_raw(3, 13, 4);
+        combined.add_map(fourth);
         assert_eq!(
-            map1.combine(map2),
-            vec![
-                Map {
-                    range: 1..5,
-                    modifier: 2
-                },
-                Map {
-                    range: 5..9,
-                    modifier: 1
-                }
-            ]
-        );
-
-        //   [   r1   ]
-        // + [ r2 ]
-        // = [ r2 ][r1]
-        let map1 = Map {
-            range: 1..9,
-            modifier: 1,
-        };
-        let map2 = Map {
-            range: 1..5,
-            modifier: 2,
-        };
-        assert_eq!(
-            map1.combine(map2),
-            vec![
-                Map {
-                    range: 1..5,
-                    modifier: 2
-                },
-                Map {
-                    range: 5..9,
-                    modifier: 1
-                }
-            ]
-        );
-
-        //   [r1]
-        // +      [r2]
-        // = [r1] [r2]
-        let map1 = Map {
-            range: 1..5,
-            modifier: 1,
-        };
-        let map2 = Map {
-            range: 10..15,
-            modifier: 2,
-        };
-        assert_eq!(
-            map1.combine(map2),
-            vec![
-                Map {
-                    range: 1..5,
-                    modifier: 1
-                },
-                Map {
-                    range: 10..15,
-                    modifier: 2
-                }
-            ]
-        );
-
-        //        [r1]
-        // + [r2]
-        // = [r2] [r1]
-        let map1 = Map {
-            range: 10..15,
-            modifier: 1,
-        };
-        let map2 = Map {
-            range: 1..5,
-            modifier: 2,
-        };
-        assert_eq!(
-            map1.combine(map2),
-            vec![
-                Map {
-                    range: 1..5,
-                    modifier: 2
-                },
-                Map {
-                    range: 10..15,
-                    modifier: 1
-                }
-            ]
+            combined.maps,
+            Some(vec![
+                Map::new_raw(1, 3, 3),
+                Map::new_raw(3, 5, 7),
+                Map::new_raw(5, 10, 10),
+                Map::new_raw(10, 13, 7),
+                Map::new_raw(13, 15, 3),
+            ])
         );
     }
 
