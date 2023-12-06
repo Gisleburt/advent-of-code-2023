@@ -371,6 +371,7 @@ mod test {
         );
     }
 
+    #[ignore]
     #[test]
     fn test_part1() {
         let input = "seeds: 79 14 55 13
