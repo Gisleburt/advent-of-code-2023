@@ -1,42 +1,38 @@
 use nom::bytes::complete::{tag, take_while};
-use nom::character::complete::{digit1, newline};
+use nom::character::complete::{self, digit1, newline};
 use nom::multi::many1;
 use nom::sequence::{preceded, separated_pair};
 use nom::IResult;
 
 #[derive(Debug, PartialEq)]
 struct TimeAndDistance {
-    time: usize,
-    distance: usize,
+    time: u32,
+    distance: u32,
 }
 
 impl TimeAndDistance {
-    fn distance_travelled(&self, held: usize) -> usize {
+    fn distance_travelled(&self, held: u32) -> u32 {
         self.time.saturating_sub(held).saturating_mul(held)
     }
 
-    fn winning_possbilities(&self) -> usize {
+    fn winning_possbilities(&self) -> u32 {
         (1..(self.time - 1))
             .map(|t| self.distance_travelled(t))
             .skip_while(|d| *d <= self.distance)
             .take_while(|d| *d > self.distance)
-            .count()
+            .count() as u32
     }
 }
 
-fn parse_numbers(input: &str) -> IResult<&str, Vec<usize>> {
-    let (remainder, strings) = many1(preceded(take_while(char::is_whitespace), digit1))(input)?;
-    Ok((
-        remainder,
-        strings.iter().map(|s| s.parse().unwrap()).collect(),
-    ))
+fn parse_numbers(input: &str) -> IResult<&str, Vec<u32>> {
+    many1(preceded(take_while(char::is_whitespace), complete::u32))(input)
 }
 
-fn parse_time(input: &str) -> IResult<&str, Vec<usize>> {
+fn parse_time(input: &str) -> IResult<&str, Vec<u32>> {
     preceded(tag("Time:"), parse_numbers)(input)
 }
 
-fn parse_distance(input: &str) -> IResult<&str, Vec<usize>> {
+fn parse_distance(input: &str) -> IResult<&str, Vec<u32>> {
     preceded(tag("Distance:"), parse_numbers)(input)
 }
 
@@ -51,16 +47,16 @@ fn input_into_time_and_distance(input: &str) -> Vec<TimeAndDistance> {
         .collect()
 }
 
-fn parse_numbers2(input: &str) -> IResult<&str, usize> {
+fn parse_numbers2(input: &str) -> IResult<&str, u32> {
     let (remainder, strings) = many1(preceded(take_while(char::is_whitespace), digit1))(input)?;
     Ok((remainder, strings.join("").parse().unwrap()))
 }
 
-fn parse_time2(input: &str) -> IResult<&str, usize> {
+fn parse_time2(input: &str) -> IResult<&str, u32> {
     preceded(tag("Time:"), parse_numbers2)(input)
 }
 
-fn parse_distance2(input: &str) -> IResult<&str, usize> {
+fn parse_distance2(input: &str) -> IResult<&str, u32> {
     preceded(tag("Distance:"), parse_numbers2)(input)
 }
 
@@ -74,7 +70,7 @@ pub fn part1(input: &str) -> String {
     input_into_time_and_distance(input)
         .into_iter()
         .map(|dt| dt.winning_possbilities())
-        .product::<usize>()
+        .product::<u32>()
         .to_string()
 }
 
@@ -91,7 +87,7 @@ mod test {
     #[test]
     fn test_parse_numbers() {
         let input = "  7  15   30";
-        assert_eq!(parse_numbers(input).unwrap().1, vec![7usize, 15, 30])
+        assert_eq!(parse_numbers(input).unwrap().1, vec![7, 15, 30])
     }
 
     #[test]
