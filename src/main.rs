@@ -6,6 +6,7 @@ mod day05;
 mod day05_failed_optimization;
 mod day06;
 mod day07;
+mod day08;
 
 use std::fs::read_to_string;
 use std::path::PathBuf;
