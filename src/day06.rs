@@ -15,7 +15,7 @@ impl TimeAndDistance {
         self.time.saturating_sub(held).saturating_mul(held)
     }
 
-    fn winning_possbilities(&self) -> u32 {
+    fn winning_possibilities(&self) -> u32 {
         (1..(self.time - 1))
             .map(|t| self.distance_travelled(t))
             .skip_while(|d| *d <= self.distance)
@@ -69,14 +69,14 @@ fn input_into_time_and_distance2(input: &str) -> TimeAndDistance {
 pub fn part1(input: &str) -> String {
     input_into_time_and_distance(input)
         .into_iter()
-        .map(|dt| dt.winning_possbilities())
+        .map(|dt| dt.winning_possibilities())
         .product::<u32>()
         .to_string()
 }
 
 pub fn part2(input: &str) -> String {
     input_into_time_and_distance2(input)
-        .winning_possbilities()
+        .winning_possibilities()
         .to_string()
 }
 
