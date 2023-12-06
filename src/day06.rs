@@ -42,7 +42,7 @@ fn input_into_time_and_distance(input: &str) -> Vec<TimeAndDistance> {
 
     times
         .into_iter()
-        .zip(distances.into_iter())
+        .zip(distances)
         .map(|(time, distance)| TimeAndDistance { time, distance })
         .collect()
 }
