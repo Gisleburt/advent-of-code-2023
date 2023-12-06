@@ -18,7 +18,8 @@ impl TimeAndDistance {
     fn winning_possbilities(&self) -> usize {
         (1..(self.time - 1))
             .map(|t| self.distance_travelled(t))
-            .filter(|d| *d > self.distance)
+            .skip_while(|d| *d <= self.distance)
+            .take_while(|d| *d > self.distance)
             .count()
     }
 }
@@ -123,10 +124,10 @@ Distance:  9  40  200";
         assert_eq!(part1(input), "288")
     }
 
-    #[ignore]
     #[test]
     fn test_part2() {
-        let input = "";
-        assert_eq!(part2(input), "")
+        let input = "Time:      7  15   30
+Distance:  9  40  200";
+        assert_eq!(part2(input), "71503")
     }
 }
