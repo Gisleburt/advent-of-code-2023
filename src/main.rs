@@ -7,6 +7,7 @@ mod day05_failed_optimization;
 mod day06;
 mod day07;
 mod day08;
+mod day09;
 
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -52,8 +53,8 @@ fn main() {
         (7, 2) => day07::part2(&input),
         (8, 1) => day08::part1(&input),
         (8, 2) => day08::part2(&input),
-        // (9, 1) => day09::part1(&input),
-        // (9, 2) => day09::part2(&input),
+        (9, 1) => day09::part1(&input),
+        (9, 2) => day09::part2(&input),
         // (10, 1) => day10::part1(&input),
         // (10, 2) => day10::part2(&input),
         // (11, 1) => day11::part1(&input),
