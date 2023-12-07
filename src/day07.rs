@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 enum CardValue {
-    Joker, // For wild cards only
+    Wild, // For wild cards only
     Two,
     Three,
     Four,
@@ -27,7 +27,7 @@ enum CardValue {
 impl CardValue {
     fn as_wild_value(&self) -> Self {
         if *self == CardValue::Jack {
-            CardValue::Joker
+            CardValue::Wild
         } else {
             *self
         }
