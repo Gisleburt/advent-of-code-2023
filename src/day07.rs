@@ -194,8 +194,7 @@ fn parse_hand_and_bid(input: &str) -> IResult<&str, (Hand, u64)> {
 pub fn part1(input: &str) -> String {
     let mut hands_and_bids: Vec<_> = input
         .lines()
-        .map(|l| parse_hand_and_bid(l).unwrap())
-        .map(|(_, hb)| hb)
+        .map(|l| parse_hand_and_bid(l).unwrap().1)
         .collect();
     hands_and_bids.sort_by_key(|hb| hb.0);
 
@@ -210,8 +209,8 @@ pub fn part1(input: &str) -> String {
 pub fn part2(input: &str) -> String {
     let mut hands_and_bids: Vec<_> = input
         .lines()
-        .map(|l| parse_hand_and_bid(l).unwrap())
-        .map(|(_, (hand, bid))| (hand.activate_wild_card(), bid))
+        .map(|l| parse_hand_and_bid(l).unwrap().1)
+        .map(|(hand, bid)| (hand.activate_wild_card(), bid))
         .collect();
     hands_and_bids.sort_by_key(|hb| hb.0);
 
