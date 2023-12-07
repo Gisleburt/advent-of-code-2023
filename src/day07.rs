@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 enum CardValue {
+    Joker, // For wild cards only
     Two,
     Three,
     Four,
@@ -23,22 +24,32 @@ enum CardValue {
     Ace,
 }
 
+impl CardValue {
+    fn as_wild_value(&self) -> Self {
+        if *self == CardValue::Jack {
+            CardValue::Joker
+        } else {
+            *self
+        }
+    }
+}
+
 impl From<char> for CardValue {
     fn from(c: char) -> Self {
         match c {
-            'A' => CardValue::Ace,
-            'K' => CardValue::King,
-            'Q' => CardValue::Queen,
-            'J' => CardValue::Jack,
-            'T' => CardValue::Ten,
-            '9' => CardValue::Nine,
-            '8' => CardValue::Eight,
-            '7' => CardValue::Seven,
-            '6' => CardValue::Six,
-            '5' => CardValue::Five,
-            '4' => CardValue::Four,
-            '3' => CardValue::Three,
             '2' => CardValue::Two,
+            '3' => CardValue::Three,
+            '4' => CardValue::Four,
+            '5' => CardValue::Five,
+            '6' => CardValue::Six,
+            '7' => CardValue::Seven,
+            '8' => CardValue::Eight,
+            '9' => CardValue::Nine,
+            'T' => CardValue::Ten,
+            'J' => CardValue::Jack,
+            'Q' => CardValue::Queen,
+            'K' => CardValue::King,
+            'A' => CardValue::Ace,
             _ => panic!("invalid card found {c}"),
         }
     }
@@ -64,7 +75,10 @@ impl Hand {
         for card in self.0.iter() {
             *occurrences.entry(card).or_insert(0) += 1;
         }
-        let mut occurrences: Vec<_> = occurrences.into_iter().map(|(a, b)| (*a, b)).collect();
+        let mut occurrences: Vec<_> = occurrences
+            .into_iter()
+            .map(|(value, count)| (*value, count))
+            .collect();
         occurrences.sort_by(|a, b| b.1.cmp(&a.1));
         let counts: Vec<&i32> = occurrences.iter().map(|(_, count)| count).collect();
         match counts[..] {
@@ -77,27 +91,86 @@ impl Hand {
             _ => HandType::HighCard,
         }
     }
+
+    fn activate_wild_card(&self) -> WildHand {
+        let mut occurrences = HashMap::new();
+        for card in self.0.iter() {
+            *occurrences.entry(card).or_insert(0) += 1;
+        }
+
+        let mut occurrences: Vec<_> = occurrences
+            .into_iter()
+            .filter(|(value, _)| **value != CardValue::Jack)
+            .map(|(value, count)| (*value, count))
+            .collect();
+        occurrences.sort_by(|a, b| b.1.cmp(&a.1));
+
+        let new_card = occurrences
+            .first()
+            .map(|(c, _)| c)
+            .unwrap_or(&CardValue::Ace);
+
+        let mut new_cards = self.0;
+        new_cards
+            .iter_mut()
+            .filter(|v| **v == CardValue::Jack)
+            .for_each(|j| *j = *new_card);
+        WildHand {
+            wild: Hand(new_cards),
+            original: *self,
+        }
+    }
 }
 
 impl PartialOrd for Hand {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.0 == other.0 {
-            return Some(Ordering::Equal);
-        }
-        let self_type = self.get_hand_type();
-        let other_type = other.get_hand_type();
-        if self_type != other_type {
-            self_type.partial_cmp(&other_type)
-        } else {
-            let first_mismatch = self.0.iter().zip(other.0).find(|(a, b)| *a != b).unwrap();
-            first_mismatch.0.partial_cmp(&first_mismatch.1)
-        }
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Hand {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+        if self.0 == other.0 {
+            return Ordering::Equal;
+        }
+        let self_type = self.get_hand_type();
+        let other_type = other.get_hand_type();
+        if self_type != other_type {
+            self_type.cmp(&other_type)
+        } else {
+            let first_mismatch = self.0.iter().zip(other.0).find(|(a, b)| *a != b).unwrap();
+            first_mismatch.0.cmp(&first_mismatch.1)
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+struct WildHand {
+    original: Hand,
+    wild: Hand,
+}
+
+impl PartialOrd for WildHand {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for WildHand {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.original == other.original {
+            return Ordering::Equal;
+        }
+        let self_type = self.wild.get_hand_type();
+        let other_type = other.wild.get_hand_type();
+        if self_type != other_type {
+            self_type.cmp(&other_type)
+        } else {
+            let iter_1 = self.original.0.iter().map(|c| c.as_wild_value());
+            let iter_2 = other.original.0.iter().map(|c| c.as_wild_value());
+            let first_mismatch = iter_1.zip(iter_2).find(|(a, b)| a != b).unwrap();
+            first_mismatch.0.cmp(&first_mismatch.1)
+        }
     }
 }
 
@@ -137,8 +210,25 @@ pub fn part1(input: &str) -> String {
         .to_string()
 }
 
-pub fn part2(_input: &str) -> String {
-    todo!()
+pub fn part2(input: &str) -> String {
+    let mut hands_and_bids: Vec<_> = input
+        .lines()
+        .map(|l| parse_hand_and_bid(l).unwrap())
+        .map(|(_, (hand, bid))| (hand.activate_wild_card(), bid))
+        // .inspect(|x| {
+        //     dbg!(x);
+        // })
+        .collect();
+    hands_and_bids.sort_by_key(|hb| hb.0);
+    hands_and_bids
+        .into_iter()
+        .enumerate()
+        // .inspect(|x| {
+        //     dbg!(x);
+        // })
+        .map(|(rank, (_hand, bid))| (rank + 1) * (bid as usize))
+        .sum::<usize>()
+        .to_string()
 }
 
 #[cfg(test)]
@@ -208,6 +298,15 @@ mod test {
             assert_eq!(hand2.get_hand_type(), HandType::TwoPair);
             assert!(hand1 > hand2);
         }
+
+        #[test]
+        fn test_wild_hand_order() {
+            let hand1 = parse_hand("QQQQ2").unwrap().1;
+            let hand2 = parse_hand("JKKK2").unwrap().1;
+            let wild_hand_1 = hand1.activate_wild_card();
+            let wild_hand_2 = hand2.activate_wild_card();
+            assert!(wild_hand_1 > wild_hand_2);
+        }
     }
 
     #[test]
@@ -220,10 +319,13 @@ QQQJA 483";
         assert_eq!(part1(input), "6440")
     }
 
-    #[ignore]
     #[test]
     fn test_part2() {
-        let input = "";
-        assert_eq!(part2(input), "")
+        let input = "32T3K 765
+T55J5 684
+KK677 28
+KTJJT 220
+QQQJA 483";
+        assert_eq!(part2(input), "5905")
     }
 }
