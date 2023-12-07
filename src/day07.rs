@@ -73,12 +73,9 @@ impl Hand {
     fn get_hand_type(&self) -> HandType {
         let mut occurrences = HashMap::new();
         for card in self.0.iter() {
-            *occurrences.entry(card).or_insert(0) += 1;
+            *occurrences.entry(*card).or_insert(0) += 1;
         }
-        let mut occurrences: Vec<_> = occurrences
-            .into_iter()
-            .map(|(value, count)| (*value, count))
-            .collect();
+        let mut occurrences: Vec<_> = occurrences.into_iter().collect();
         occurrences.sort_by(|a, b| b.1.cmp(&a.1));
         let counts: Vec<&i32> = occurrences.iter().map(|(_, count)| count).collect();
         match counts[..] {
@@ -90,6 +87,10 @@ impl Hand {
             [2, 1, 1, 1] => HandType::OnePair,
             _ => HandType::HighCard,
         }
+    }
+
+    fn first_non_matching_cards(&self, other: &Self) -> Option<(CardValue, CardValue)> {
+        self.0.iter().copied().zip(other.0).find(|(a, b)| a != b)
     }
 
     fn activate_wild_card(&self) -> WildHand {
@@ -138,8 +139,8 @@ impl Ord for Hand {
         if self_type != other_type {
             self_type.cmp(&other_type)
         } else {
-            let first_mismatch = self.0.iter().zip(other.0).find(|(a, b)| *a != b).unwrap();
-            first_mismatch.0.cmp(&first_mismatch.1)
+            let (a, b) = self.first_non_matching_cards(other).unwrap();
+            a.cmp(&b)
         }
     }
 }
@@ -166,10 +167,11 @@ impl Ord for WildHand {
         if self_type != other_type {
             self_type.cmp(&other_type)
         } else {
-            let iter_1 = self.original.0.iter().map(|c| c.as_wild_value());
-            let iter_2 = other.original.0.iter().map(|c| c.as_wild_value());
-            let first_mismatch = iter_1.zip(iter_2).find(|(a, b)| a != b).unwrap();
-            first_mismatch.0.cmp(&first_mismatch.1)
+            let (a, b) = self
+                .original
+                .first_non_matching_cards(&other.original)
+                .unwrap();
+            a.as_wild_value().cmp(&b.as_wild_value())
         }
     }
 }
@@ -194,17 +196,12 @@ pub fn part1(input: &str) -> String {
         .lines()
         .map(|l| parse_hand_and_bid(l).unwrap())
         .map(|(_, hb)| hb)
-        // .inspect(|x| {
-        //     dbg!(x);
-        // })
         .collect();
     hands_and_bids.sort_by_key(|hb| hb.0);
+
     hands_and_bids
         .iter()
         .enumerate()
-        // .inspect(|(rank, (hand, bid))| {
-        //     dbg!((rank, hand, bid));
-        // })
         .map(|(rank, (_hand, bid))| (rank + 1) * (*bid as usize))
         .sum::<usize>()
         .to_string()
@@ -215,17 +212,12 @@ pub fn part2(input: &str) -> String {
         .lines()
         .map(|l| parse_hand_and_bid(l).unwrap())
         .map(|(_, (hand, bid))| (hand.activate_wild_card(), bid))
-        // .inspect(|x| {
-        //     dbg!(x);
-        // })
         .collect();
     hands_and_bids.sort_by_key(|hb| hb.0);
+
     hands_and_bids
         .into_iter()
         .enumerate()
-        // .inspect(|x| {
-        //     dbg!(x);
-        // })
         .map(|(rank, (_hand, bid))| (rank + 1) * (bid as usize))
         .sum::<usize>()
         .to_string()
