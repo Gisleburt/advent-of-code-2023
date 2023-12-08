@@ -4,7 +4,7 @@ Advent of Code 2023
 
 In this repository you will find the code and my personal text inputs
 
-To use with my input files (located in `./inputs`):
+Place your input files in `./inputs` and label them `d<num>.txt` (this should be a two digit number eg `d01.txt`):
 
 ```sh
 $ cargo run -d <day> -p <part>
@@ -14,8 +14,7 @@ eg
 $ cargo run -d 1 -p 2
 ```
 
-To use with your own input files (might be useful to see if I get the same answer but please don't cheat 😉) you can
-specify them like this:
+To use with arbitrary input files you can specify them like this:
 
 ```sh
 $ cargo run <input-file> -d <day> -p <part>
@@ -37,4 +36,4 @@ Completed Tasks:
 - Day 5 ⭐️⭐️
 - Day 6 ⭐️⭐️
 - Day 7 ⭐️⭐️
-- Day 8 ⭐️
+- Day 8 ⭐️⭐️
