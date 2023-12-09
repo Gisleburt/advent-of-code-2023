@@ -61,16 +61,17 @@ pub fn part1(input: &str) -> String {
             .collect(),
     );
     let mut current_position = "AAA";
-    let mut steps = 0;
-    loop {
-        for instruction in instructions.chars() {
-            steps += 1;
+
+    instructions
+        .chars()
+        .cycle()
+        .enumerate()
+        .find_map(|(step, instruction)| {
             current_position = map.next_pos(current_position, instruction);
-            if current_position == "ZZZ" {
-                return steps.to_string();
-            }
-        }
-    }
+            (current_position == "ZZZ").then_some(step + 1)
+        })
+        .expect("You can not end an infinite iterator")
+        .to_string()
 }
 
 fn is_finish(pos: &str) -> bool {
@@ -110,22 +111,16 @@ fn is_start(pos: &str) -> bool {
 
 fn get_first_exit(start: &str, map: &HashMapping, instructions: &str) -> usize {
     let mut pos = start;
-    let mut steps = 0;
 
-    let mut seen_steps = vec![(start, 0)];
-
-    loop {
-        for (inst_n, inst) in instructions.chars().enumerate() {
-            steps += 1;
-            pos = map.next_pos(pos, inst);
-
-            if is_finish(pos) {
-                return steps;
-            }
-
-            seen_steps.push((pos, inst_n));
-        }
-    }
+    instructions
+        .chars()
+        .cycle()
+        .enumerate()
+        .find_map(|(step, instruction)| {
+            pos = map.next_pos(pos, instruction);
+            is_finish(pos).then_some(step + 1) // (Steps starts at 0 but we want to start at 1)
+        })
+        .expect("You can not end an infinite iterator")
 }
 
 pub fn part2(input: &str) -> String {
@@ -141,13 +136,7 @@ pub fn part2(input: &str) -> String {
         .copied()
         .filter(|key| is_start(key))
         .map(|start| get_first_exit(start, &map, instructions))
-        .fold(None, |acc, cur| {
-            if let Some(acc) = acc {
-                Some(lcm(acc, cur))
-            } else {
-                Some(cur)
-            }
-        })
+        .fold(None, |acc, cur| acc.map(|a| lcm(a, cur)).or(Some(cur)))
         .unwrap()
         .to_string()
 }
