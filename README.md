@@ -38,3 +38,4 @@ Completed Tasks:
 - Day 7 ⭐️⭐️
 - Day 8 ⭐️⭐️
 - Day 9 ⭐️⭐️
+- Day 10 ⭐️⭐️
