@@ -11,6 +11,7 @@ mod day09;
 mod day10;
 mod day11;
 mod day12;
+mod day13;
 
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -64,8 +65,8 @@ fn main() {
         (11, 2) => day11::part2(&input),
         (12, 1) => day12::part1(&input),
         (12, 2) => day12::part2(&input),
-        // (13, 1) => day13::part1(&input),
-        // (13, 2) => day13::part2(&input),
+        (13, 1) => day13::part1(&input),
+        (13, 2) => day13::part2(&input),
         // (14, 1) => day14::part1(&input),
         // (14, 2) => day14::part2(&input),
         // (15, 1) => day15::part1(&input),
