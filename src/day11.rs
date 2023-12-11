@@ -173,14 +173,14 @@ impl GalaxyLocation {
 }
 
 struct GalacticDistances {
-    from: GalaxyLocation,
+    _from: GalaxyLocation,
     distances: VecDeque<(usize, GalaxyLocation)>,
 }
 
 impl GalacticDistances {
     fn new(from: GalaxyLocation, galaxies: &Vec<GalaxyLocation>) -> Self {
         Self {
-            from: from,
+            _from: from,
             distances: galaxies
                 .iter()
                 .copied()
@@ -261,10 +261,9 @@ pub fn part1(input: &str) -> String {
         .to_string()
 }
 
-pub fn part2(input: &str) -> String {
-    let mut image = get_image_from_input(input);
+fn part_2_with_expansion(input: &str, expansion: usize) -> String {
+    let image = get_image_from_input(input);
     let mut galaxies = image.get_galaxies();
-    let expansion = 1_000_000;
 
     let mut count = 0;
     while let Some(galaxy) = galaxies.pop() {
@@ -277,6 +276,10 @@ pub fn part2(input: &str) -> String {
             .sum::<usize>()
     }
     count.to_string()
+}
+
+pub fn part2(input: &str) -> String {
+    part_2_with_expansion(input, 1_000_000)
 }
 
 #[cfg(test)]
@@ -385,21 +388,7 @@ mod test {
 ..........
 .......#..
 #...#.....";
-        let mut image = get_image_from_input(input);
-        let mut galaxies = image.get_galaxies();
-        let expansion = 10;
-
-        let mut count = 0;
-        while let Some(galaxy) = galaxies.pop() {
-            count += galaxies
-                .iter()
-                .map(|other| {
-                    image.in_an_expanded_universe_what_is_the_distance_between(
-                        expansion, galaxy, *other,
-                    )
-                })
-                .sum::<usize>()
-        }
-        assert_eq!(count, 1030)
+        assert_eq!(part_2_with_expansion(input, 10), "1030");
+        assert_eq!(part_2_with_expansion(input, 100), "8410");
     }
 }
