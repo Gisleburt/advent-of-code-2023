@@ -191,30 +191,9 @@ impl GalacticDistances {
         }
     }
 
-    // fn remove_pair(self, pair: &GalacticPair) -> Option<Self> {
-    //     if pair.includes(&self.from) {
-    //         None
-    //     } else {
-    //         Some(Self {
-    //             from: self.from,
-    //             distances: self
-    //                 .distances
-    //                 .into_iter()
-    //                 .filter(|(_, location)| !pair.includes(&location))
-    //                 .collect(),
-    //         })
-    //     }
-    // }
-
     fn distance_to_all_galaxies(&self) -> usize {
         self.distances.iter().map(|(distance, _)| distance).sum()
     }
-
-    // fn to_closest_pair(mut self) -> Option<GalacticPair> {
-    //     self.distances
-    //         .pop_front()
-    //         .map(|(_, closest)| GalacticPair(closest, self.from))
-    // }
 }
 
 impl Eq for GalacticDistances {}
@@ -254,19 +233,6 @@ impl Ord for GalacticDistances {
     }
 }
 
-// #[derive(Debug, Copy, Clone)]
-// struct GalacticPair(GalaxyLocation, GalaxyLocation);
-//
-// impl GalacticPair {
-//     fn includes(&self, location: &GalaxyLocation) -> bool {
-//         &self.0 == location || &self.1 == location
-//     }
-//
-//     fn get_distance(&self) -> usize {
-//         self.0.distance_to(&self.1)
-//     }
-// }
-
 fn parse_image(input: &str) -> IResult<&str, Image> {
     map(
         separated_list1(
@@ -280,36 +246,6 @@ fn parse_image(input: &str) -> IResult<&str, Image> {
 fn get_image_from_input(input: &str) -> Image {
     parse_image(input).expect("Image could not be parsed").1
 }
-
-// pub fn part1(input: &str) -> String {
-//     let mut image = get_image_from_input(input);
-//     image.expand();
-//
-//     let galaxies = image.get_galaxies();
-//     let mut distances: VecDeque<_> = galaxies
-//         .iter()
-//         .map(|galaxy| galaxy.distances_to(&galaxies))
-//         .sorted()
-//         .collect();
-//     let mut found_pairs: Vec<GalacticPair> = Vec::new();
-//
-//     while let Some(distance) = distances.pop_front() {
-//         if let Some(pair) = distance.to_closest_pair() {
-//             found_pairs.push(pair);
-//             distances = distances
-//                 .into_iter()
-//                 .filter_map(move |d| d.remove_pair(&pair))
-//                 .sorted()
-//                 .collect();
-//         }
-//     }
-//
-//     found_pairs
-//         .iter()
-//         .map(|pair| pair.get_distance())
-//         .sum::<usize>()
-//         .to_string()
-// }
 
 pub fn part1(input: &str) -> String {
     let mut image = get_image_from_input(input);
