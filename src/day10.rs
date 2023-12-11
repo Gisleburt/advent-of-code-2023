@@ -338,7 +338,6 @@ pub fn part2(input: &str) -> String {
     let pipe_map = parse_pipe_map(input).unwrap().1;
     let path = pipe_map.get_shortest_path();
     let new_map = pipe_map.remove_all_but_path(path);
-    eprintln!("{new_map}");
     new_map.n_points_inside_pipes().to_string()
 }
 
