@@ -30,17 +30,21 @@ impl Image {
             .all(|galaxy| galaxy.is_none())
     }
 
-    fn expand_row(&mut self, row: usize) {
-        self.0.insert(row, self[row].clone());
+    fn expand_row_by(&mut self, row: usize, by: usize) {
+        for _ in 0..(by - 1) {
+            self.0.insert(row, self[row].clone());
+        }
     }
 
-    fn expand_column(&mut self, column: usize) {
+    fn expand_column_by(&mut self, column: usize, by: usize) {
         self.0.iter_mut().for_each(|row| {
-            row.insert(column, row[column]);
+            for _ in 0..(by - 1) {
+                row.insert(column, row[column]);
+            }
         })
     }
 
-    fn expand(&mut self) {
+    fn expand_by(&mut self, by: usize) {
         // Expand rows
         let rows_to_expand: Vec<_> = (0..self.height())
             .into_iter()
@@ -49,7 +53,7 @@ impl Image {
             .collect();
         rows_to_expand
             .into_iter()
-            .for_each(|row| self.expand_row(row));
+            .for_each(|row| self.expand_row_by(row, by));
         // Expand columns
         let columns_to_expand: Vec<_> = (0..self.width())
             .into_iter()
@@ -58,7 +62,7 @@ impl Image {
             .collect();
         columns_to_expand
             .into_iter()
-            .for_each(|column| self.expand_column(column))
+            .for_each(|column| self.expand_column_by(column, by))
     }
 
     fn get_galaxies(&self) -> Vec<GalaxyLocation> {
@@ -71,6 +75,35 @@ impl Image {
                     .map(move |(column, galaxy)| GalaxyLocation::new(galaxy, row, column))
             })
             .collect()
+    }
+
+    fn in_an_expanded_universe_what_is_the_distance_between(
+        &self,
+        expansion: usize,
+        from: GalaxyLocation,
+        to: GalaxyLocation,
+    ) -> usize {
+        let top = from.row.min(to.row);
+        let bottom = from.row.max(to.row);
+        let left = from.column.min(to.column);
+        let right = from.column.max(to.column);
+
+        let mut count = 0;
+        count += (top..bottom)
+            .into_iter()
+            .map(|row| if self.is_row_empty(row) { expansion } else { 1 })
+            .sum::<usize>();
+        count += (left..right)
+            .into_iter()
+            .map(|column| {
+                if self.is_column_empty(column) {
+                    expansion
+                } else {
+                    1
+                }
+            })
+            .sum::<usize>();
+        count
     }
 }
 
@@ -158,30 +191,30 @@ impl GalacticDistances {
         }
     }
 
-    fn remove_pair(self, pair: &GalacticPair) -> Option<Self> {
-        if pair.includes(&self.from) {
-            None
-        } else {
-            Some(Self {
-                from: self.from,
-                distances: self
-                    .distances
-                    .into_iter()
-                    .filter(|(_, location)| !pair.includes(&location))
-                    .collect(),
-            })
-        }
-    }
+    // fn remove_pair(self, pair: &GalacticPair) -> Option<Self> {
+    //     if pair.includes(&self.from) {
+    //         None
+    //     } else {
+    //         Some(Self {
+    //             from: self.from,
+    //             distances: self
+    //                 .distances
+    //                 .into_iter()
+    //                 .filter(|(_, location)| !pair.includes(&location))
+    //                 .collect(),
+    //         })
+    //     }
+    // }
 
     fn distance_to_all_galaxies(&self) -> usize {
         self.distances.iter().map(|(distance, _)| distance).sum()
     }
 
-    fn to_closest_pair(mut self) -> Option<GalacticPair> {
-        self.distances
-            .pop_front()
-            .map(|(_, closest)| GalacticPair(closest, self.from))
-    }
+    // fn to_closest_pair(mut self) -> Option<GalacticPair> {
+    //     self.distances
+    //         .pop_front()
+    //         .map(|(_, closest)| GalacticPair(closest, self.from))
+    // }
 }
 
 impl Eq for GalacticDistances {}
@@ -221,18 +254,18 @@ impl Ord for GalacticDistances {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-struct GalacticPair(GalaxyLocation, GalaxyLocation);
-
-impl GalacticPair {
-    fn includes(&self, location: &GalaxyLocation) -> bool {
-        &self.0 == location || &self.1 == location
-    }
-
-    fn get_distance(&self) -> usize {
-        self.0.distance_to(&self.1)
-    }
-}
+// #[derive(Debug, Copy, Clone)]
+// struct GalacticPair(GalaxyLocation, GalaxyLocation);
+//
+// impl GalacticPair {
+//     fn includes(&self, location: &GalaxyLocation) -> bool {
+//         &self.0 == location || &self.1 == location
+//     }
+//
+//     fn get_distance(&self) -> usize {
+//         self.0.distance_to(&self.1)
+//     }
+// }
 
 fn parse_image(input: &str) -> IResult<&str, Image> {
     map(
@@ -280,7 +313,7 @@ fn get_image_from_input(input: &str) -> Image {
 
 pub fn part1(input: &str) -> String {
     let mut image = get_image_from_input(input);
-    image.expand();
+    image.expand_by(2);
 
     let galaxies = image.get_galaxies();
     galaxies
@@ -292,8 +325,22 @@ pub fn part1(input: &str) -> String {
         .to_string()
 }
 
-pub fn part2(_input: &str) -> String {
-    todo!()
+pub fn part2(input: &str) -> String {
+    let mut image = get_image_from_input(input);
+    let mut galaxies = image.get_galaxies();
+    let expansion = 1_000_000;
+
+    let mut count = 0;
+    while let Some(galaxy) = galaxies.pop() {
+        count += galaxies
+            .iter()
+            .map(|other| {
+                image
+                    .in_an_expanded_universe_what_is_the_distance_between(expansion, galaxy, *other)
+            })
+            .sum::<usize>()
+    }
+    count.to_string()
 }
 
 #[cfg(test)]
@@ -348,7 +395,7 @@ mod test {
 .........#...
 #....#.......";
             let mut image = get_test_image();
-            image.expand();
+            image.expand_by(2);
             assert_eq!(image.to_string(), expected_expansion);
         }
 
@@ -390,10 +437,33 @@ mod test {
         assert_eq!(part1(input), "374")
     }
 
-    #[ignore]
     #[test]
     fn test_part2() {
-        let input = "";
-        assert_eq!(part2(input), "")
+        let input = "...#......
+.......#..
+#.........
+..........
+......#...
+.#........
+.........#
+..........
+.......#..
+#...#.....";
+        let mut image = get_image_from_input(input);
+        let mut galaxies = image.get_galaxies();
+        let expansion = 10;
+
+        let mut count = 0;
+        while let Some(galaxy) = galaxies.pop() {
+            count += galaxies
+                .iter()
+                .map(|other| {
+                    image.in_an_expanded_universe_what_is_the_distance_between(
+                        expansion, galaxy, *other,
+                    )
+                })
+                .sum::<usize>()
+        }
+        assert_eq!(count, 1030)
     }
 }
