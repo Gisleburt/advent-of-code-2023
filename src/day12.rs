@@ -5,11 +5,12 @@ use bitvec::view::BitView;
 use indicatif::ProgressIterator;
 use itertools::Itertools;
 use nom::branch::alt;
-use nom::character::complete::{self, char, space1};
+use nom::character::complete::{self, char, newline, space1};
 use nom::combinator::{map, value};
 use nom::multi::{many1, separated_list1};
 use nom::sequence::separated_pair;
 use nom::IResult;
+use rayon::prelude::*;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 enum Condition {
@@ -77,7 +78,7 @@ impl ConditionReport {
 
     fn find_possible_arrangements(&self) -> usize {
         (0..(2_u32.pow(self.conditions.len() as u32)))
-            .into_iter()
+            .into_par_iter()
             .filter(|test| self.could_number_fit(*test as u32))
             .count()
     }
@@ -207,12 +208,22 @@ fn parse_condition_report(input: &str) -> IResult<&str, ConditionReport> {
     )(input)
 }
 
+fn parse_condition_reports(input: &str) -> IResult<&str, Vec<ConditionReport>> {
+    separated_list1(newline, parse_condition_report)(input)
+}
+
+fn input_to_report(input: &str) -> ConditionReport {
+    parse_condition_report(input).unwrap().1
+}
+
+fn input_to_reports(input: &str) -> Vec<ConditionReport> {
+    parse_condition_reports(input).unwrap().1
+}
+
 pub fn part1(input: &str) -> String {
-    input
-        .lines()
-        .map(parse_condition_report)
-        .map(|r| r.unwrap())
-        .map(|(_, report)| report)
+    let reports = input_to_reports(input);
+    reports
+        .into_par_iter()
         .map(|report| report.find_possible_arrangements())
         .sum::<usize>()
         .to_string()
@@ -300,8 +311,7 @@ mod test {
 
         #[test]
         fn test_get_possible_broken_group_sizes() {
-            let input = ".??..??...?##. 1,1,3";
-            let report = parse_condition_report(input).unwrap().1;
+            let report = input_to_report(".??..??...?##. 1,1,3");
             let groups = report.get_possible_broken_groups();
             assert_eq!(groups[0], vec![None, None]);
             assert_eq!(groups[1], vec![None, None]);
@@ -380,8 +390,7 @@ mod test {
 
         #[test]
         fn test_could_number_fit() {
-            let input = ".??..??...?##. 1,1,3";
-            let report = parse_condition_report(input).unwrap().1;
+            let report = input_to_report(".??..??...?##. 1,1,3");
 
             let number = 0b01000100001110;
             assert!(report.could_number_fit(number));
@@ -395,17 +404,15 @@ mod test {
 
         #[test]
         fn test_find_possible_conditions() {
-            let report = parse_condition_report("???.### 1,1,3").unwrap().1;
+            let report = input_to_report("???.### 1,1,3");
             assert_eq!(report.find_possible_arrangements(), 1);
-            let report = parse_condition_report(".??..??...?##. 1,1,3").unwrap().1;
+            let report = input_to_report(".??..??...?##. 1,1,3");
             assert_eq!(report.find_possible_arrangements(), 4);
-            let report = parse_condition_report("?#?#?#?#?#?#?#? 1,3,1,6").unwrap().1;
+            let report = input_to_report("?#?#?#?#?#?#?#? 1,3,1,6");
             assert_eq!(report.find_possible_arrangements(), 1);
-            let report = parse_condition_report("????.######..#####. 1,6,5")
-                .unwrap()
-                .1;
+            let report = input_to_report("????.######..#####. 1,6,5");
             assert_eq!(report.find_possible_arrangements(), 4);
-            let report = parse_condition_report("?###???????? 3,2,1").unwrap().1;
+            let report = input_to_report("?###???????? 3,2,1");
             assert_eq!(report.find_possible_arrangements(), 10);
         }
 
@@ -413,6 +420,23 @@ mod test {
         fn test_number_to_groups() {
             assert_eq!(number_to_groups(5), vec![1, 1]);
             assert_eq!(number_to_groups(13), vec![2, 1]);
+        }
+
+        #[test]
+        fn test_must_may_contain() {
+            // let report = input_to_report(".??..??...?##. 1,1,3");
+            // assert_eq!(
+            //     report.must_contain(),
+            //     vec![vec![], vec![], vec![vec![2], vec![3]]]
+            // );
+            // assert_eq!(
+            //     report.may_contaon(),
+            //     vec![
+            //         vec![vec![1], vec![1]],
+            //         vec![vec![1], vec![1]],
+            //         vec![vec![2], vec![3]]
+            //     ]
+            // );
         }
     }
 
@@ -430,7 +454,12 @@ mod test {
     #[ignore]
     #[test]
     fn test_part2() {
-        let input = "";
-        assert_eq!(part2(input), "")
+        let input = "???.### 1,1,3
+.??..??...?##. 1,1,3
+?#?#?#?#?#?#?#? 1,3,1,6
+????.#...#... 4,1,1
+????.######..#####. 1,6,5
+?###???????? 3,2,1";
+        assert_eq!(part2(input), "525152")
     }
 }

@@ -1,3 +1,10 @@
+use std::fs::read_to_string;
+use std::path::PathBuf;
+use std::process::exit;
+use std::time::Instant;
+
+use structopt::StructOpt;
+
 mod day01;
 mod day02;
 mod day03;
@@ -10,13 +17,8 @@ mod day09;
 mod day10;
 mod day11;
 mod day12;
+mod day12_part2;
 mod day13;
-
-use std::fs::read_to_string;
-use std::path::PathBuf;
-use std::process::exit;
-use std::time::Instant;
-use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
@@ -61,7 +63,7 @@ fn main() {
         (11, 1) => day11::part1(&input),
         (11, 2) => day11::part2(&input),
         (12, 1) => day12::part1(&input),
-        (12, 2) => day12::part2(&input),
+        (12, 2) => day12_part2::part2(&input),
         (13, 1) => day13::part1(&input),
         (13, 2) => day13::part2(&input),
         // (14, 1) => day14::part1(&input),
