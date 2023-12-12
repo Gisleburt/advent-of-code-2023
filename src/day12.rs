@@ -1,5 +1,7 @@
 use bitvec::field::BitField;
+use bitvec::order::Msb0;
 use bitvec::prelude::BitVec;
+use bitvec::view::BitView;
 use indicatif::ProgressIterator;
 use itertools::Itertools;
 use nom::branch::alt;
@@ -19,8 +21,66 @@ type Groups = Vec<u64>;
 
 #[derive(Debug, Clone, PartialEq)]
 struct ConditionReport {
-    known_conditions: Vec<Option<Condition>>,
+    conditions: Vec<Option<Condition>>,
     groups: Groups,
+    good_number: u32,
+    bad_number: u32,
+}
+
+impl ConditionReport {
+    fn get_good_number(conditions: &[Option<Condition>]) -> u32 {
+        let bitvec: BitVec = conditions
+            .iter()
+            .map(|condition| *condition == Some(Condition::Good))
+            .rev()
+            .collect();
+        bitvec.load()
+    }
+    fn get_bad_number(conditions: &[Option<Condition>]) -> u32 {
+        let bitvec: BitVec = conditions
+            .iter()
+            .map(|condition| *condition == Some(Condition::Bad))
+            .rev()
+            .collect();
+        bitvec.load()
+    }
+
+    fn new(conditions: Vec<Option<Condition>>, groups: Groups) -> Self {
+        let good_number = Self::get_good_number(&conditions);
+        let bad_number = Self::get_bad_number(&conditions);
+        Self {
+            conditions,
+            good_number,
+            bad_number,
+            groups,
+        }
+    }
+
+    // 1101
+    // 1001
+    // 0010
+
+    fn could_number_fit(&self, number: u32) -> bool {
+        number_to_groups(number) == self.groups
+            && (number & self.bad_number == self.bad_number)
+            && (!number & self.good_number == self.good_number)
+    }
+
+    fn get_possible_broken_groups(&self) -> Vec<Vec<Option<Condition>>> {
+        get_bad_and_unknown_conditions(&self.conditions)
+    }
+
+    fn validate_possible_conditions(&self, possible_conditions: Vec<Condition>) -> bool {
+        conditions_to_groups(&possible_conditions) == self.groups
+            && validate_possible_conditions(&self.conditions, &possible_conditions)
+    }
+
+    fn find_possible_arrangements(&self) -> usize {
+        (0..(2_u32.pow(self.conditions.len() as u32)))
+            .into_iter()
+            .filter(|test| self.could_number_fit(*test as u32))
+            .count()
+    }
 }
 
 fn triangular_number(input: u64, increasing_base_size: u64) -> u64 {
@@ -43,6 +103,19 @@ fn conditions_to_groups(conditions: &[Condition]) -> Groups {
         .filter(|(key, _value)| *key)
         .map(|(_key, value)| value.into_iter().count() as u64)
         .collect()
+}
+
+fn number_to_groups(number: u32) -> Groups {
+    let bitvec: BitVec = number.view_bits::<Msb0>().iter().collect();
+
+    let result = bitvec
+        .into_iter()
+        .group_by(|bit| *bit)
+        .into_iter()
+        .filter(|(key, _value)| *key)
+        .map(|(_key, value)| value.count() as u64)
+        .collect();
+    result
 }
 
 // Split Good, Bad and unknown conditions into groups of bad and unknown seperated by where good is
@@ -70,39 +143,6 @@ fn get_bad_conditions(conditions: &[Option<Condition>]) -> Vec<Vec<Condition>> {
                 .collect::<Vec<_>>()
         })
         .collect()
-}
-
-struct ConditionsToNumber {
-    conditions: Vec<Option<Condition>>,
-    good_number: u32,
-    bad_number: u32,
-}
-
-impl ConditionsToNumber {
-    fn get_good_number(conditions: &[Option<Condition>]) -> u32 {
-        let bitvec: BitVec = conditions
-            .iter()
-            .map(|condition| *condition == Some(Condition::Good))
-            .collect();
-        bitvec.load()
-    }
-    fn get_bad_number(conditions: &[Option<Condition>]) -> u32 {
-        let bitvec: BitVec = conditions
-            .iter()
-            .map(|condition| *condition == Some(Condition::Good))
-            .collect();
-        bitvec.load()
-    }
-
-    fn new(conditions: Vec<Option<Condition>>) -> Self {
-        let good_number = Self::get_good_number(&conditions);
-        let bad_number = Self::get_bad_number(&conditions);
-        Self {
-            conditions,
-            good_number,
-            bad_number,
-        }
-    }
 }
 
 fn may_contain(conditions: &[Option<Condition>]) -> Vec<Groups> {
@@ -142,23 +182,9 @@ fn validate_possible_conditions(
         .all(|(possible, known)| known.is_none() || known.as_ref() == Some(possible))
 }
 
-impl ConditionReport {
-    fn get_possible_broken_groups(&self) -> Vec<Vec<Option<Condition>>> {
-        get_bad_and_unknown_conditions(&self.known_conditions)
-    }
-
-    fn validate_possible_conditions(&self, possible_conditions: Vec<Condition>) -> bool {
-        conditions_to_groups(&possible_conditions) == self.groups
-            && validate_possible_conditions(&self.known_conditions, &possible_conditions)
-    }
-}
-
 impl From<(Vec<Option<Condition>>, Groups)> for ConditionReport {
     fn from((known_conditions, groups): (Vec<Option<Condition>>, Groups)) -> Self {
-        Self {
-            known_conditions,
-            groups,
-        }
+        Self::new(known_conditions, groups)
     }
 }
 
@@ -181,9 +207,15 @@ fn parse_condition_report(input: &str) -> IResult<&str, ConditionReport> {
     )(input)
 }
 
-pub fn part1(_input: &str) -> String {
-    let vec: Vec<_> = (0..(2_u32.pow(20))).into_iter().progress().collect();
-    vec.len().to_string()
+pub fn part1(input: &str) -> String {
+    input
+        .lines()
+        .map(parse_condition_report)
+        .map(|r| r.unwrap())
+        .map(|(_, report)| report)
+        .map(|report| report.find_possible_arrangements())
+        .sum::<usize>()
+        .to_string()
 }
 
 pub fn part2(_input: &str) -> String {
@@ -262,7 +294,7 @@ mod test {
         fn test_parse_condition_report() {
             let input = ".??..??...?##. 1,1,3";
             let report = parse_condition_report(input).unwrap().1;
-            assert_eq!(report.known_conditions.len(), 14);
+            assert_eq!(report.conditions.len(), 14);
             assert_eq!(report.groups, vec![1, 1, 3]);
         }
 
@@ -281,10 +313,10 @@ mod test {
 
         #[test]
         fn test_validate_possible_conditions() {
-            let report = ConditionReport {
-                known_conditions: vec![Some(Condition::Bad), None, Some(Condition::Good), None],
-                groups: vec![1, 1],
-            };
+            let report = ConditionReport::new(
+                vec![Some(Condition::Bad), None, Some(Condition::Good), None],
+                vec![1, 1],
+            );
 
             // Valid
             assert!(report.validate_possible_conditions(vec![
@@ -331,9 +363,59 @@ mod test {
                 Condition::Bad
             ]));
         }
+
+        #[test]
+        fn test_condition_report_numbers() {
+            let conditions = vec![
+                Some(Condition::Good),
+                Some(Condition::Good),
+                None,
+                Some(Condition::Bad),
+            ];
+            let num = ConditionReport::new(conditions, vec![]);
+
+            assert_eq!(num.good_number, 12);
+            assert_eq!(num.bad_number, 1);
+        }
+
+        #[test]
+        fn test_could_number_fit() {
+            let input = ".??..??...?##. 1,1,3";
+            let report = parse_condition_report(input).unwrap().1;
+
+            let number = 0b01000100001110;
+            assert!(report.could_number_fit(number));
+            let number = 0b00100100001110;
+            assert!(report.could_number_fit(number));
+            let number = 0b01000010001110;
+            assert!(report.could_number_fit(number));
+            let number = 0b00100010001110;
+            assert!(report.could_number_fit(number));
+        }
+
+        #[test]
+        fn test_find_possible_conditions() {
+            let report = parse_condition_report("???.### 1,1,3").unwrap().1;
+            assert_eq!(report.find_possible_arrangements(), 1);
+            let report = parse_condition_report(".??..??...?##. 1,1,3").unwrap().1;
+            assert_eq!(report.find_possible_arrangements(), 4);
+            let report = parse_condition_report("?#?#?#?#?#?#?#? 1,3,1,6").unwrap().1;
+            assert_eq!(report.find_possible_arrangements(), 1);
+            let report = parse_condition_report("????.######..#####. 1,6,5")
+                .unwrap()
+                .1;
+            assert_eq!(report.find_possible_arrangements(), 4);
+            let report = parse_condition_report("?###???????? 3,2,1").unwrap().1;
+            assert_eq!(report.find_possible_arrangements(), 10);
+        }
+
+        #[test]
+        fn test_number_to_groups() {
+            assert_eq!(number_to_groups(5), vec![1, 1]);
+            assert_eq!(number_to_groups(13), vec![2, 1]);
+        }
     }
 
-    #[ignore]
     #[test]
     fn test_part1() {
         let input = "???.### 1,1,3
@@ -342,7 +424,7 @@ mod test {
 ????.#...#... 4,1,1
 ????.######..#####. 1,6,5
 ?###???????? 3,2,1";
-        assert_eq!(part1(input), "12")
+        assert_eq!(part1(input), "21")
     }
 
     #[ignore]
