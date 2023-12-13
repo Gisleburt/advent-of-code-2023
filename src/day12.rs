@@ -2,7 +2,6 @@ use bitvec::field::BitField;
 use bitvec::order::Msb0;
 use bitvec::prelude::BitVec;
 use bitvec::view::BitView;
-use indicatif::ProgressIterator;
 use itertools::Itertools;
 use nom::branch::alt;
 use nom::character::complete::{self, char, newline, space1};
@@ -67,121 +66,120 @@ impl ConditionReport {
             && (!number & self.good_number == self.good_number)
     }
 
-    fn get_possible_broken_groups(&self) -> Vec<Vec<Option<Condition>>> {
-        get_bad_and_unknown_conditions(&self.conditions)
-    }
+    // fn get_possible_broken_groups(&self) -> Vec<Vec<Option<Condition>>> {
+    //     get_bad_and_unknown_conditions(&self.conditions)
+    // }
 
-    fn validate_possible_conditions(&self, possible_conditions: Vec<Condition>) -> bool {
-        conditions_to_groups(&possible_conditions) == self.groups
-            && validate_possible_conditions(&self.conditions, &possible_conditions)
-    }
+    // fn validate_possible_conditions(&self, possible_conditions: Vec<Condition>) -> bool {
+    //     conditions_to_groups(&possible_conditions) == self.groups
+    //         && validate_possible_conditions(&self.conditions, &possible_conditions)
+    // }
 
     fn find_possible_arrangements(&self) -> usize {
         (0..(2_u32.pow(self.conditions.len() as u32)))
             .into_par_iter()
-            .filter(|test| self.could_number_fit(*test as u32))
+            .filter(|test| self.could_number_fit(*test))
             .count()
     }
 }
 
-fn triangular_number(input: u64, increasing_base_size: u64) -> u64 {
-    let mut count = 1;
-    for layer in 1..input {
-        count += (increasing_base_size * layer) + 1
-    }
-    count
-}
+// fn triangular_number(input: u64, increasing_base_size: u64) -> u64 {
+//     let mut count = 1;
+//     for layer in 1..input {
+//         count += (increasing_base_size * layer) + 1
+//     }
+//     count
+// }
 
-fn combinations_of_set(set_size: u64, jiggle_room: u64) -> u64 {
-    triangular_number(jiggle_room + 1, set_size)
-}
+// fn combinations_of_set(set_size: u64, jiggle_room: u64) -> u64 {
+//     triangular_number(jiggle_room + 1, set_size)
+// }
 
-fn conditions_to_groups(conditions: &[Condition]) -> Groups {
-    conditions
-        .iter()
-        .group_by(|condition| *condition == &Condition::Bad)
-        .into_iter()
-        .filter(|(key, _value)| *key)
-        .map(|(_key, value)| value.into_iter().count() as u64)
-        .collect()
-}
+// fn conditions_to_groups(conditions: &[Condition]) -> Groups {
+//     conditions
+//         .iter()
+//         .group_by(|condition| *condition == &Condition::Bad)
+//         .into_iter()
+//         .filter(|(key, _value)| *key)
+//         .map(|(_key, value)| value.into_iter().count() as u64)
+//         .collect()
+// }
 
 fn number_to_groups(number: u32) -> Groups {
     let bitvec: BitVec = number.view_bits::<Msb0>().iter().collect();
 
-    let result = bitvec
+    bitvec
         .into_iter()
         .group_by(|bit| *bit)
         .into_iter()
         .filter(|(key, _value)| *key)
         .map(|(_key, value)| value.count() as u64)
-        .collect();
-    result
-}
-
-// Split Good, Bad and unknown conditions into groups of bad and unknown seperated by where good is
-fn get_bad_and_unknown_conditions(conditions: &[Option<Condition>]) -> Vec<Vec<Option<Condition>>> {
-    conditions
-        .iter()
-        .group_by(|condition| condition.as_ref() != Some(&Condition::Good))
-        .into_iter()
-        .filter(|(key, _value)| *key)
-        .map(|(_key, value)| value.into_iter().copied().collect())
         .collect()
 }
 
-// Split Good, Bad and unknown conditions into groups of bad and unknown seperated by where good is
-fn get_bad_conditions(conditions: &[Option<Condition>]) -> Vec<Vec<Condition>> {
-    conditions
-        .iter()
-        .group_by(|condition| condition.as_ref() == Some(&Condition::Bad))
-        .into_iter()
-        .filter(|(key, _value)| *key)
-        .map(|(_key, value)| {
-            value
-                .into_iter()
-                .filter_map(|cond| *cond)
-                .collect::<Vec<_>>()
-        })
-        .collect()
-}
+// // Split Good, Bad and unknown conditions into groups of bad and unknown seperated by where good is
+// fn get_bad_and_unknown_conditions(conditions: &[Option<Condition>]) -> Vec<Vec<Option<Condition>>> {
+//     conditions
+//         .iter()
+//         .group_by(|condition| condition.as_ref() != Some(&Condition::Good))
+//         .into_iter()
+//         .filter(|(key, _value)| *key)
+//         .map(|(_key, value)| value.into_iter().copied().collect())
+//         .collect()
+// }
 
-fn may_contain(conditions: &[Option<Condition>]) -> Vec<Groups> {
-    if conditions
-        .iter()
-        .any(|condition| condition.as_ref() == Some(&Condition::Good))
-    {
-        panic!("split out good conditions before using may_contain")
-    }
+// // Split Good, Bad and unknown conditions into groups of bad and unknown seperated by where good is
+// fn get_bad_conditions(conditions: &[Option<Condition>]) -> Vec<Vec<Condition>> {
+//     conditions
+//         .iter()
+//         .group_by(|condition| condition.as_ref() == Some(&Condition::Bad))
+//         .into_iter()
+//         .filter(|(key, _value)| *key)
+//         .map(|(_key, value)| {
+//             value
+//                 .into_iter()
+//                 .filter_map(|cond| *cond)
+//                 .collect::<Vec<_>>()
+//         })
+//         .collect()
+// }
 
-    // ??#?#
-    // 00101
-    // 00111
-    // 01101
-    // 01111
-    // 11101
-    // 11111
-    // This is binary!
+// fn may_contain(conditions: &[Option<Condition>]) -> Vec<Groups> {
+//     if conditions
+//         .iter()
+//         .any(|condition| condition.as_ref() == Some(&Condition::Good))
+//     {
+//         panic!("split out good conditions before using may_contain")
+//     }
+//
+//     // ??#?#
+//     // 00101
+//     // 00111
+//     // 01101
+//     // 01111
+//     // 11101
+//     // 11111
+//     // This is binary!
+//
+//     // let box_size = conditions.len();
+//
+//     vec![]
+// }
 
-    let box_size = conditions.len();
-
-    vec![]
-}
-
-fn validate_possible_conditions(
-    known_conditions: &[Option<Condition>],
-    possible_conditions: &[Condition],
-) -> bool {
-    // Could return false here but if these don't match it won't work
-    if possible_conditions.len() != known_conditions.len() {
-        panic!("Invalid length of possible conditions (did not match length of known conditions")
-    }
-
-    possible_conditions
-        .iter()
-        .zip(known_conditions.iter())
-        .all(|(possible, known)| known.is_none() || known.as_ref() == Some(possible))
-}
+// fn validate_possible_conditions(
+//     known_conditions: &[Option<Condition>],
+//     possible_conditions: &[Condition],
+// ) -> bool {
+//     // Could return false here but if these don't match it won't work
+//     if possible_conditions.len() != known_conditions.len() {
+//         panic!("Invalid length of possible conditions (did not match length of known conditions")
+//     }
+//
+//     possible_conditions
+//         .iter()
+//         .zip(known_conditions.iter())
+//         .all(|(possible, known)| known.is_none() || known.as_ref() == Some(possible))
+// }
 
 impl From<(Vec<Option<Condition>>, Groups)> for ConditionReport {
     fn from((known_conditions, groups): (Vec<Option<Condition>>, Groups)) -> Self {
@@ -212,9 +210,9 @@ fn parse_condition_reports(input: &str) -> IResult<&str, Vec<ConditionReport>> {
     separated_list1(newline, parse_condition_report)(input)
 }
 
-fn input_to_report(input: &str) -> ConditionReport {
-    parse_condition_report(input).unwrap().1
-}
+// fn input_to_report(input: &str) -> ConditionReport {
+//     parse_condition_report(input).unwrap().1
+// }
 
 fn input_to_reports(input: &str) -> Vec<ConditionReport> {
     parse_condition_reports(input).unwrap().1
@@ -237,69 +235,73 @@ pub fn part2(_input: &str) -> String {
 mod test {
     use super::*;
 
+    fn input_to_report(input: &str) -> ConditionReport {
+        parse_condition_report(input).unwrap().1
+    }
+
     mod parts {
         use super::*;
 
-        #[test]
-        fn test_triangle_number() {
-            let base = 1;
-            assert_eq!(triangular_number(1, base), 1); // O
-            assert_eq!(triangular_number(2, base), 3); // O OO
-            assert_eq!(triangular_number(3, base), 6); // O OO OOO
-            assert_eq!(triangular_number(4, base), 10); // O OO OOO OOOO
+        // #[test]
+        // fn test_triangle_number() {
+        //     let base = 1;
+        //     assert_eq!(triangular_number(1, base), 1); // O
+        //     assert_eq!(triangular_number(2, base), 3); // O OO
+        //     assert_eq!(triangular_number(3, base), 6); // O OO OOO
+        //     assert_eq!(triangular_number(4, base), 10); // O OO OOO OOOO
+        //
+        //     let base = 2;
+        //     assert_eq!(triangular_number(1, base), 1); // O
+        //     assert_eq!(triangular_number(2, base), 4); // O OOO
+        //     assert_eq!(triangular_number(3, base), 9); // O OOO OOOOO
+        //     assert_eq!(triangular_number(4, base), 16); // O OOO OOOOO OOOOOOO
+        //
+        //     let base = 3;
+        //     assert_eq!(triangular_number(1, base), 1); // O
+        //     assert_eq!(triangular_number(2, base), 5); // O OOOO
+        //     assert_eq!(triangular_number(3, base), 12); // O OOOO OOOOOOO
+        //     assert_eq!(triangular_number(4, base), 22); // O OOOO OOOOOOO OOOOOOOOOO
+        // }
 
-            let base = 2;
-            assert_eq!(triangular_number(1, base), 1); // O
-            assert_eq!(triangular_number(2, base), 4); // O OOO
-            assert_eq!(triangular_number(3, base), 9); // O OOO OOOOO
-            assert_eq!(triangular_number(4, base), 16); // O OOO OOOOO OOOOOOO
+        // #[test]
+        // fn test_combinations_of_set() {
+        //     let set_size = 1;
+        //     assert_eq!(combinations_of_set(set_size, 0), 1); // O
+        //     assert_eq!(combinations_of_set(set_size, 1), 3); // O OO
+        //     assert_eq!(combinations_of_set(set_size, 2), 6); // O OO OOO
+        //     assert_eq!(combinations_of_set(set_size, 3), 10); // O OO OOO OOOO
+        //
+        //     let set_size = 2;
+        //     assert_eq!(combinations_of_set(set_size, 0), 1); // O
+        //     assert_eq!(combinations_of_set(set_size, 1), 4); // O OOO
+        //     assert_eq!(combinations_of_set(set_size, 2), 9); // O OOO OOOOO
+        //     assert_eq!(combinations_of_set(set_size, 3), 16); // O OOO OOOOO OOOOOOO
+        //
+        //     let set_size = 3;
+        //     assert_eq!(combinations_of_set(set_size, 0), 1); // O
+        //     assert_eq!(combinations_of_set(set_size, 1), 5); // O OOOO
+        //     assert_eq!(combinations_of_set(set_size, 2), 12); // O OOOO OOOOOOO
+        //     assert_eq!(combinations_of_set(set_size, 3), 22); // O OOOO OOOOOOO OOOOOOOOOO
+        // }
 
-            let base = 3;
-            assert_eq!(triangular_number(1, base), 1); // O
-            assert_eq!(triangular_number(2, base), 5); // O OOOO
-            assert_eq!(triangular_number(3, base), 12); // O OOOO OOOOOOO
-            assert_eq!(triangular_number(4, base), 22); // O OOOO OOOOOOO OOOOOOOOOO
-        }
-
-        #[test]
-        fn test_combinations_of_set() {
-            let set_size = 1;
-            assert_eq!(combinations_of_set(set_size, 0), 1); // O
-            assert_eq!(combinations_of_set(set_size, 1), 3); // O OO
-            assert_eq!(combinations_of_set(set_size, 2), 6); // O OO OOO
-            assert_eq!(combinations_of_set(set_size, 3), 10); // O OO OOO OOOO
-
-            let set_size = 2;
-            assert_eq!(combinations_of_set(set_size, 0), 1); // O
-            assert_eq!(combinations_of_set(set_size, 1), 4); // O OOO
-            assert_eq!(combinations_of_set(set_size, 2), 9); // O OOO OOOOO
-            assert_eq!(combinations_of_set(set_size, 3), 16); // O OOO OOOOO OOOOOOO
-
-            let set_size = 3;
-            assert_eq!(combinations_of_set(set_size, 0), 1); // O
-            assert_eq!(combinations_of_set(set_size, 1), 5); // O OOOO
-            assert_eq!(combinations_of_set(set_size, 2), 12); // O OOOO OOOOOOO
-            assert_eq!(combinations_of_set(set_size, 3), 22); // O OOOO OOOOOOO OOOOOOOOOO
-        }
-
-        #[test]
-        fn test_grouping_of_valid_conditions() {
-            let conditions = [Condition::Bad];
-            assert_eq!(conditions_to_groups(&conditions), vec![1]);
-            let conditions = [Condition::Bad, Condition::Bad];
-            assert_eq!(conditions_to_groups(&conditions), vec![2]);
-            let conditions = [Condition::Bad, Condition::Good, Condition::Bad];
-            assert_eq!(conditions_to_groups(&conditions), vec![1, 1]);
-            let conditions = [
-                Condition::Good,
-                Condition::Bad,
-                Condition::Good,
-                Condition::Bad,
-                Condition::Bad,
-                Condition::Good,
-            ];
-            assert_eq!(conditions_to_groups(&conditions), vec![1, 2]);
-        }
+        // #[test]
+        // fn test_grouping_of_valid_conditions() {
+        //     let conditions = [Condition::Bad];
+        //     assert_eq!(conditions_to_groups(&conditions), vec![1]);
+        //     let conditions = [Condition::Bad, Condition::Bad];
+        //     assert_eq!(conditions_to_groups(&conditions), vec![2]);
+        //     let conditions = [Condition::Bad, Condition::Good, Condition::Bad];
+        //     assert_eq!(conditions_to_groups(&conditions), vec![1, 1]);
+        //     let conditions = [
+        //         Condition::Good,
+        //         Condition::Bad,
+        //         Condition::Good,
+        //         Condition::Bad,
+        //         Condition::Bad,
+        //         Condition::Good,
+        //     ];
+        //     assert_eq!(conditions_to_groups(&conditions), vec![1, 2]);
+        // }
 
         #[test]
         fn test_parse_condition_report() {
@@ -309,70 +311,70 @@ mod test {
             assert_eq!(report.groups, vec![1, 1, 3]);
         }
 
-        #[test]
-        fn test_get_possible_broken_group_sizes() {
-            let report = input_to_report(".??..??...?##. 1,1,3");
-            let groups = report.get_possible_broken_groups();
-            assert_eq!(groups[0], vec![None, None]);
-            assert_eq!(groups[1], vec![None, None]);
-            assert_eq!(
-                groups[2],
-                vec![None, Some(Condition::Bad), Some(Condition::Bad)]
-            );
-        }
+        // #[test]
+        // fn test_get_possible_broken_group_sizes() {
+        //     let report = input_to_report(".??..??...?##. 1,1,3");
+        //     let groups = report.get_possible_broken_groups();
+        //     assert_eq!(groups[0], vec![None, None]);
+        //     assert_eq!(groups[1], vec![None, None]);
+        //     assert_eq!(
+        //         groups[2],
+        //         vec![None, Some(Condition::Bad), Some(Condition::Bad)]
+        //     );
+        // }
 
-        #[test]
-        fn test_validate_possible_conditions() {
-            let report = ConditionReport::new(
-                vec![Some(Condition::Bad), None, Some(Condition::Good), None],
-                vec![1, 1],
-            );
-
-            // Valid
-            assert!(report.validate_possible_conditions(vec![
-                Condition::Bad,
-                Condition::Good,
-                Condition::Good,
-                Condition::Bad
-            ]));
-
-            // Invalid
-            // Group is 1,2
-            assert!(!report.validate_possible_conditions(vec![
-                Condition::Bad,
-                Condition::Good,
-                Condition::Bad,
-                Condition::Bad
-            ]));
-            // Group is 2,1
-            assert!(!report.validate_possible_conditions(vec![
-                Condition::Bad,
-                Condition::Bad,
-                Condition::Good,
-                Condition::Bad
-            ]));
-            // Group is 1
-            assert!(!report.validate_possible_conditions(vec![
-                Condition::Bad,
-                Condition::Good,
-                Condition::Good,
-                Condition::Good
-            ]));
-            // Good is Bad
-            assert!(!report.validate_possible_conditions(vec![
-                Condition::Bad,
-                Condition::Good,
-                Condition::Bad,
-                Condition::Good
-            ]));
-            // Bad is Good
-            assert!(!report.validate_possible_conditions(vec![
-                Condition::Good,
-                Condition::Bad,
-                Condition::Good,
-                Condition::Bad
-            ]));
-        }
+        // #[test]
+        // fn test_validate_possible_conditions() {
+        //     let report = ConditionReport::new(
+        //         vec![Some(Condition::Bad), None, Some(Condition::Good), None],
+        //         vec![1, 1],
+        //     );
+        //
+        //     // Valid
+        //     assert!(report.validate_possible_conditions(vec![
+        //         Condition::Bad,
+        //         Condition::Good,
+        //         Condition::Good,
+        //         Condition::Bad,
+        //     ]));
+        //
+        //     // Invalid
+        //     // Group is 1,2
+        //     assert!(!report.validate_possible_conditions(vec![
+        //         Condition::Bad,
+        //         Condition::Good,
+        //         Condition::Bad,
+        //         Condition::Bad,
+        //     ]));
+        //     // Group is 2,1
+        //     assert!(!report.validate_possible_conditions(vec![
+        //         Condition::Bad,
+        //         Condition::Bad,
+        //         Condition::Good,
+        //         Condition::Bad,
+        //     ]));
+        //     // Group is 1
+        //     assert!(!report.validate_possible_conditions(vec![
+        //         Condition::Bad,
+        //         Condition::Good,
+        //         Condition::Good,
+        //         Condition::Good,
+        //     ]));
+        //     // Good is Bad
+        //     assert!(!report.validate_possible_conditions(vec![
+        //         Condition::Bad,
+        //         Condition::Good,
+        //         Condition::Bad,
+        //         Condition::Good,
+        //     ]));
+        //     // Bad is Good
+        //     assert!(!report.validate_possible_conditions(vec![
+        //         Condition::Good,
+        //         Condition::Bad,
+        //         Condition::Good,
+        //         Condition::Bad,
+        //     ]));
+        // }
 
         #[test]
         fn test_condition_report_numbers() {

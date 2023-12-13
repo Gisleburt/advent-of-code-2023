@@ -1,13 +1,14 @@
+use std::cmp::Ordering;
+use std::collections::VecDeque;
+use std::fmt::{Display, Formatter};
+use std::ops::{Deref, Div};
+
 use itertools::Itertools;
 use nom::branch::alt;
 use nom::character::complete::{char, newline};
 use nom::combinator::{map, value};
 use nom::multi::{many1, separated_list1};
 use nom::IResult;
-use std::cmp::Ordering;
-use std::collections::VecDeque;
-use std::fmt::{Display, Formatter};
-use std::ops::{Deref, Div};
 
 struct Image(Vec<Vec<Option<usize>>>);
 
@@ -47,7 +48,6 @@ impl Image {
     fn expand_by(&mut self, by: usize) {
         // Expand rows
         let rows_to_expand: Vec<_> = (0..self.height())
-            .into_iter()
             .rev() // Don't forget to work backwards
             .filter(|row| self.is_row_empty(*row))
             .collect();
@@ -56,7 +56,6 @@ impl Image {
             .for_each(|row| self.expand_row_by(row, by));
         // Expand columns
         let columns_to_expand: Vec<_> = (0..self.width())
-            .into_iter()
             .rev() // The expansion of space is no joke
             .filter(|column| self.is_column_empty(*column))
             .collect();
@@ -90,11 +89,9 @@ impl Image {
 
         let mut count = 0;
         count += (top..bottom)
-            .into_iter()
             .map(|row| if self.is_row_empty(row) { expansion } else { 1 })
             .sum::<usize>();
         count += (left..right)
-            .into_iter()
             .map(|column| {
                 if self.is_column_empty(column) {
                     expansion
@@ -167,7 +164,7 @@ impl GalaxyLocation {
         self.row.abs_diff(other.row) + self.column.abs_diff(other.column)
     }
 
-    fn distances_to(&self, others: &Vec<GalaxyLocation>) -> GalacticDistances {
+    fn distances_to(&self, others: &[GalaxyLocation]) -> GalacticDistances {
         GalacticDistances::new(*self, others)
     }
 }
@@ -178,7 +175,7 @@ struct GalacticDistances {
 }
 
 impl GalacticDistances {
-    fn new(from: GalaxyLocation, galaxies: &Vec<GalaxyLocation>) -> Self {
+    fn new(from: GalaxyLocation, galaxies: &[GalaxyLocation]) -> Self {
         Self {
             _from: from,
             distances: galaxies
@@ -218,16 +215,10 @@ impl Ord for GalacticDistances {
         self.distances
             .iter()
             .zip(&other.distances)
-            .find_map(|(s, o)| {
-                if s.0 == o.0 {
-                    None
-                } else {
-                    if s.0 > o.0 {
-                        Some(Ordering::Greater)
-                    } else {
-                        Some(Ordering::Less)
-                    }
-                }
+            .find_map(|(s, o)| match s.0.cmp(&o.0) {
+                Ordering::Equal => None,
+                Ordering::Less => Some(Ordering::Less),
+                Ordering::Greater => Some(Ordering::Greater),
             })
             .unwrap_or(Ordering::Equal)
     }
