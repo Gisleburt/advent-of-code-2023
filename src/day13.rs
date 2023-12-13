@@ -9,6 +9,10 @@ use nom::IResult;
 #[derive(Debug, PartialEq)]
 struct RockAndAshMap(Vec<Vec<bool>>);
 
+fn is_smudged(v1: &[bool], v2: &[bool]) -> bool {
+    v1.iter().zip(v2).filter(|(a, b)| a != b).count() == 1
+}
+
 impl RockAndAshMap {
     fn is_mirror_point(&self, row: usize) -> bool {
         if row == 0 || row >= self.0.len() {
@@ -23,14 +27,34 @@ impl RockAndAshMap {
             .zip(rows_forward)
             .all(|(back, forward)| back == forward)
     }
-
     fn find_mirror_point(&self) -> Option<usize> {
-        for row in 0..self.0.len() {
-            if self.is_mirror_point(row) {
-                return Some(row);
-            }
+        (0..self.0.len()).find(|&row| self.is_mirror_point(row))
+    }
+
+    fn is_mirror_point_with_smudge(&self, row: usize) -> bool {
+        if row == 0 || row >= self.0.len() {
+            return false;
         }
-        None
+
+        // We need to work outwards from the row
+        let rows_backwards = self.0[0..row].iter().rev();
+        let rows_forward = self.0[row..].iter();
+
+        let mut smudge_used = false;
+        for (back, forward) in rows_backwards.zip(rows_forward) {
+            if back == forward {
+                continue;
+            }
+            if smudge_used || !is_smudged(back, forward) {
+                return false;
+            }
+            smudge_used = true;
+        }
+        smudge_used
+    }
+
+    fn find_mirror_point_with_smudge(&self) -> Option<usize> {
+        (0..self.0.len()).find(|&row| self.is_mirror_point_with_smudge(row))
     }
 
     fn transpose(&self) -> RockAndAshMap {
@@ -64,23 +88,40 @@ fn parse_rock_and_ash_maps(input: &str) -> IResult<&str, Vec<RockAndAshMap>> {
     separated_list1(pair(newline, newline), parse_rock_and_ash_map)(input)
 }
 
-pub fn part1(_input: &str) -> String {
-    todo!()
+pub fn part1(input: &str) -> String {
+    let maps = parse_rock_and_ash_maps(input).unwrap().1;
+
+    maps.iter()
+        .map(|map| {
+            map.find_mirror_point()
+                .map(|mirror| mirror * 100)
+                .or_else(|| map.transpose().find_mirror_point())
+                .unwrap_or(0)
+        })
+        .sum::<usize>()
+        .to_string()
 }
 
-pub fn part2(_input: &str) -> String {
-    todo!()
+pub fn part2(input: &str) -> String {
+    let maps = parse_rock_and_ash_maps(input).unwrap().1;
+
+    maps.iter()
+        .map(|map| {
+            map.find_mirror_point_with_smudge()
+                .map(|mirror| mirror * 100)
+                .or_else(|| map.transpose().find_mirror_point_with_smudge())
+                .unwrap_or(0)
+        })
+        .sum::<usize>()
+        .to_string()
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    mod parsers {
-        use super::*;
-
-        fn get_test_input() -> &'static str {
-            "#.##..##.
+    fn get_test_input() -> &'static str {
+        "#.##..##.
 ..#.##.#.
 ##......#
 ##......#
@@ -95,7 +136,10 @@ mod test {
 #####.##.
 ..##..###
 #....#..#"
-        }
+    }
+
+    mod parsers {
+        use super::*;
 
         #[test]
         fn test_parse_rock_or_ash() {
@@ -183,19 +227,41 @@ mod test {
             ]);
             assert_eq!(map.find_mirror_point(), Some(4));
         }
+
+        #[test]
+        fn test_is_smudged() {
+            let v1 = vec![true, true, true, true];
+            let v2 = vec![true, true, false, true];
+            assert!(is_smudged(&v1, &v2));
+
+            let v1 = vec![true, true, true, true];
+            let v2 = vec![true, false, false, true];
+            assert!(!is_smudged(&v1, &v2));
+        }
+
+        #[test]
+        fn test_find_mirror_point_with_smudge() {
+            let input = "#.##..##.
+..#.##.#.
+##......#
+##......#
+..#.##.#.
+..##..##.
+#.#.##.#.";
+            let map = parse_rock_and_ash_map(input).unwrap().1;
+            assert_eq!(map.find_mirror_point_with_smudge(), Some(3))
+        }
     }
 
-    #[ignore]
     #[test]
     fn test_part1() {
-        let input = "";
-        assert_eq!(part1(input), "")
+        let input = get_test_input();
+        assert_eq!(part1(input), "405")
     }
 
-    #[ignore]
     #[test]
     fn test_part2() {
-        let input = "";
-        assert_eq!(part2(input), "")
+        let input = get_test_input();
+        assert_eq!(part2(input), "400")
     }
 }

@@ -9,7 +9,9 @@ Place your input files in `./inputs` and label them `d<num>.txt` (this should be
 ```sh
 $ cargo run -d <day> -p <part>
 ```
+
 eg
+
 ```
 $ cargo run -d 1 -p 2
 ```
@@ -19,7 +21,9 @@ To use with arbitrary input files you can specify them like this:
 ```sh
 $ cargo run <input-file> -d <day> -p <part>
 ```
+
 eg
+
 ```
 $ cargo run some-input.txt -d 1 -p 2
 ```
@@ -41,3 +45,4 @@ Completed Tasks:
 - Day 10 ⭐️⭐️
 - Day 11 ⭐️⭐️
 - Day 12 ⭐️
+- Day 13 ⭐️⭐️
