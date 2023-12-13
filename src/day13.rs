@@ -27,6 +27,7 @@ impl RockAndAshMap {
             .zip(rows_forward)
             .all(|(back, forward)| back == forward)
     }
+
     fn find_mirror_point(&self) -> Option<usize> {
         (0..self.0.len()).find(|&row| self.is_mirror_point(row))
     }
