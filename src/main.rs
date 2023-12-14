@@ -20,6 +20,7 @@ mod day12;
 // mod day12_part2;
 mod day13;
 mod day14;
+mod day15;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
@@ -69,8 +70,8 @@ fn main() {
         (13, 2) => day13::part2(&input),
         (14, 1) => day14::part1(&input),
         (14, 2) => day14::part2(&input),
-        // (15, 1) => day15::part1(&input),
-        // (15, 2) => day15::part2(&input),
+        (15, 1) => day15::part1(&input),
+        (15, 2) => day15::part2(&input),
         // (16, 1) => day16::part1(&input),
         // (16, 2) => day16::part2(&input),
         // (17, 1) => day17::part1(&input),
