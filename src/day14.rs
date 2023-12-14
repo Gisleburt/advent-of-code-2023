@@ -18,13 +18,12 @@ fn roll_rocks(rocks: &[Option<Rock>]) -> Vec<Option<Rock>> {
         .copied()
         .group_by(|rock| rock == &Some(Rock::Cube))
         .into_iter()
-        .map(|(_, subset)| {
+        .flat_map(|(_, subset)| {
             let mut v = subset.into_iter().collect_vec();
             v.sort();
             v.reverse();
             v
         })
-        .flatten()
         .collect()
 }
 
@@ -43,24 +42,52 @@ fn get_load(rocks: &[Option<Rock>]) -> usize {
 struct RockMap(Vec<Vec<Option<Rock>>>);
 
 impl RockMap {
-    fn transpose(&self) -> Self {
-        let v = &self.0;
-        let rows = v.len();
-        let cols = v[0].len();
-
-        let transposed: Vec<Vec<_>> = (0..cols)
-            .map(|col| (0..rows).map(|row| v[row][col]).collect())
-            .collect();
-
-        RockMap(transposed)
-    }
-
     fn roll_rocks(&self) -> Self {
         RockMap(self.0.iter().map(|row| roll_rocks(row)).collect())
     }
 
     fn get_load(&self) -> usize {
         self.0.iter().map(|row| get_load(row)).sum()
+    }
+
+    fn rotate_counter_clockwise(&self) -> Self {
+        let mut temp = self.0.clone(); // Temp store, we'll rewrite all data but its now the same size
+        let row_length = self.0.len();
+        let column_length = self.0[0].len();
+
+        for row in 0..row_length {
+            for col in 0..column_length {
+                temp[column_length - col - 1][row] = self.0[row][col];
+            }
+        }
+
+        RockMap(temp)
+    }
+
+    #[allow(clippy::needless_range_loop)] // Want to keep this the same as the other loop
+    fn rotate_clockwise(&self) -> Self {
+        let mut temp = self.0.clone(); // Temp store, we'll rewrite all data but its now the same size
+        let row_length = self.0.len();
+        let column_length = self.0[0].len();
+
+        for row in 0..row_length {
+            for col in 0..column_length {
+                temp[col][column_length - row - 1] = self.0[row][col];
+            }
+        }
+
+        RockMap(temp)
+    }
+
+    fn spin(&self) -> Self {
+        self.roll_rocks()
+            .rotate_clockwise()
+            .roll_rocks()
+            .rotate_clockwise()
+            .roll_rocks()
+            .rotate_clockwise()
+            .roll_rocks()
+            .rotate_clockwise()
     }
 }
 
@@ -77,16 +104,31 @@ fn parse_rocks(input: &str) -> IResult<&str, Vec<Option<Rock>>> {
 }
 
 fn parse_rock_map(input: &str) -> IResult<&str, RockMap> {
-    map(separated_list1(newline, parse_rocks), |v| RockMap(v))(input)
+    map(separated_list1(newline, parse_rocks), RockMap)(input)
+}
+
+fn get_prerotated_map(input: &str) -> RockMap {
+    parse_rock_map(input).unwrap().1.rotate_counter_clockwise()
 }
 
 pub fn part1(input: &str) -> String {
-    let rock_map = parse_rock_map(input).unwrap().1.transpose().roll_rocks();
+    let rock_map = get_prerotated_map(input).roll_rocks();
     rock_map.get_load().to_string()
 }
 
-pub fn part2(_input: &str) -> String {
-    todo!()
+pub fn part2(input: &str) -> String {
+    let mut history = vec![get_prerotated_map(input)];
+    let loop_start = loop {
+        let new_map = history.last().unwrap().spin();
+        let found_pos = history.iter().position(|map| map == &new_map);
+        if let Some(pos) = found_pos {
+            break pos;
+        }
+        history.push(new_map);
+    };
+    let loop_size = history.len() - loop_start;
+    let billionth_map_pos = ((1_000_000_000_usize - loop_start) % loop_size) + loop_start;
+    history[billionth_map_pos].get_load().to_string()
 }
 
 #[cfg(test)]
@@ -110,6 +152,22 @@ O.#..O.#.#
         use Rock::*;
 
         use super::*;
+
+        #[test]
+        fn test_get_prerotated_map() {
+            let rock_map = get_prerotated_map(
+                "#.O
+..O
+..O",
+            );
+            let expected = RockMap(vec![
+                vec![Some(Round), Some(Round), Some(Round)],
+                vec![None, None, None],
+                vec![Some(Cube), None, None],
+            ]);
+
+            assert_eq!(rock_map, expected);
+        }
 
         #[test]
         fn test_roll_rocks() {
@@ -148,7 +206,23 @@ O.#..O.#.#
         }
 
         #[test]
-        fn test_transpose() {
+        fn test_rotate_counter_clockwise() {
+            let rocks = RockMap(vec![
+                vec![Some(Cube), None, Some(Round)],
+                vec![Some(Cube), None, None],
+                vec![Some(Cube), None, Some(Cube)],
+            ]);
+            let expected = RockMap(vec![
+                vec![Some(Round), None, Some(Cube)],
+                vec![None, None, None],
+                vec![Some(Cube), Some(Cube), Some(Cube)],
+            ]);
+
+            assert_eq!(rocks.rotate_counter_clockwise(), expected)
+        }
+
+        #[test]
+        fn test_rotate_clockwise() {
             let rocks = RockMap(vec![
                 vec![Some(Cube), None, Some(Round)],
                 vec![Some(Cube), None, None],
@@ -157,10 +231,10 @@ O.#..O.#.#
             let expected = RockMap(vec![
                 vec![Some(Cube), Some(Cube), Some(Cube)],
                 vec![None, None, None],
-                vec![Some(Round), None, Some(Cube)],
+                vec![Some(Cube), None, Some(Round)],
             ]);
 
-            assert_eq!(rocks.transpose(), expected)
+            assert_eq!(rocks.rotate_clockwise(), expected)
         }
 
         #[test]
@@ -178,6 +252,23 @@ O.#..O.#.#
 
             assert_eq!(rocks.roll_rocks(), expected)
         }
+
+        #[test]
+        fn test_spin() {
+            let initial = get_prerotated_map(get_test_input());
+            let expected_input_1 = ".....#....
+....#...O#
+...OO##...
+.OO#......
+.....OOO#.
+.O#...O#.#
+....O#....
+......OOOO
+#...O###..
+#..OO#....";
+            let expected = get_prerotated_map(expected_input_1);
+            assert_eq!(initial.spin(), expected);
+        }
     }
 
     #[test]
@@ -186,10 +277,9 @@ O.#..O.#.#
         assert_eq!(part1(input), "136");
     }
 
-    #[ignore]
     #[test]
     fn test_part2() {
-        let input = "";
-        assert_eq!(part2(input), "")
+        let input = get_test_input();
+        assert_eq!(part2(input), "64")
     }
 }
