@@ -25,6 +25,12 @@ mod day16;
 mod day17;
 mod day18;
 mod day19;
+mod day20;
+mod day21;
+mod day22;
+mod day23;
+mod day24;
+mod day25;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
@@ -84,18 +90,18 @@ fn main() {
         (18, 2) => day18::part2(&input),
         (19, 1) => day19::part1(&input),
         (19, 2) => day19::part2(&input),
-        // (20, 1) => day20::part1(&input),
-        // (20, 2) => day20::part2(&input),
-        // (21, 1) => day21::part1(&input),
-        // (21, 2) => day21::part2(&input),
-        // (22, 1) => day22::part1(&input),
-        // (22, 2) => day22::part2(&input),
-        // (23, 1) => day23::part1(&input),
-        // (23, 2) => day23::part2(&input),
-        // (24, 1) => day24::part1(&input),
-        // (24, 2) => day24::part2(&input),
-        // (25, 1) => day25::part1(&input),
-        // (25, 2) => day25::part2(&input),
+        (20, 1) => day20::part1(&input),
+        (20, 2) => day20::part2(&input),
+        (21, 1) => day21::part1(&input),
+        (21, 2) => day21::part2(&input),
+        (22, 1) => day22::part1(&input),
+        (22, 2) => day22::part2(&input),
+        (23, 1) => day23::part1(&input),
+        (23, 2) => day23::part2(&input),
+        (24, 1) => day24::part1(&input),
+        (24, 2) => day24::part2(&input),
+        (25, 1) => day25::part1(&input),
+        (25, 2) => day25::part2(&input),
         _ => {
             eprintln!("Day {} part {} not found", opt.day, opt.part);
             exit(1);
