@@ -50,4 +50,5 @@ Completed Tasks:
 - Day 15 ⭐️⭐️
 - Day 16 ⭐️⭐️
 - Day 17
-- Day 18 ⭐️
+- Day 18 ⭐️❌ - part 2 won't work with fill (maybe due to the fill function not enabling tail recursion) and I'm too lazy
+  to figure it out

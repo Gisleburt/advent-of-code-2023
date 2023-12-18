@@ -4,12 +4,12 @@ use std::ops::Add;
 use derive_more::{Deref, DerefMut, From};
 use itertools::Itertools;
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_while_m_n};
+use nom::bytes::complete::take_while_m_n;
 use nom::character::complete;
 use nom::character::complete::{newline, space1};
 use nom::combinator::{map, map_res, value};
 use nom::multi::separated_list1;
-use nom::sequence::{delimited, tuple};
+use nom::sequence::{delimited, preceded, tuple};
 use nom::IResult;
 use num::abs;
 
@@ -32,38 +32,51 @@ fn parse_direction(input: &str) -> IResult<&str, Direction> {
     ))(input)
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct Color {
-    red: u8,
-    green: u8,
-    blue: u8,
+fn parse_direction_alt(input: &str) -> IResult<&str, Direction> {
+    alt((
+        value(Up, complete::char('3')),
+        value(Down, complete::char('1')),
+        value(Left, complete::char('2')),
+        value(Right, complete::char('0')),
+    ))(input)
 }
 
-//// All parts of the color parser ripped from nom: docs https://docs.rs/nom/7.1.3/nom/index.html
-fn from_hex(input: &str) -> Result<u8, std::num::ParseIntError> {
-    u8::from_str_radix(input, 16)
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct AltInstruction {
+    direction: Direction,
+    distance: u64,
+}
+
+fn from_hex(input: &str) -> Result<u64, std::num::ParseIntError> {
+    u64::from_str_radix(input, 16)
 }
 
 fn is_hex_digit(c: char) -> bool {
     c.is_digit(16)
 }
 
-fn parse_hex(input: &str) -> IResult<&str, u8> {
-    map_res(take_while_m_n(2, 2, is_hex_digit), from_hex)(input)
+fn parse_distance_alt(input: &str) -> IResult<&str, u64> {
+    map_res(take_while_m_n(5, 5, is_hex_digit), from_hex)(input)
 }
 
-fn parse_color(input: &str) -> IResult<&str, Color> {
-    let (input, _) = tag("#")(input)?;
-    let (input, (red, green, blue)) = tuple((parse_hex, parse_hex, parse_hex))(input)?;
-
-    Ok((input, Color { red, green, blue }))
+fn parse_alt_instruction(input: &str) -> IResult<&str, AltInstruction> {
+    map(
+        preceded(
+            complete::char('#'),
+            tuple((parse_distance_alt, parse_direction_alt)),
+        ),
+        |(distance, direction)| AltInstruction {
+            distance,
+            direction,
+        },
+    )(input)
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct Instruction {
     direction: Direction,
-    amount: u8,
-    color: Color,
+    distance: u8,
+    alt: AltInstruction,
 }
 
 fn parse_instruction(input: &str) -> IResult<&str, Instruction> {
@@ -73,24 +86,28 @@ fn parse_instruction(input: &str) -> IResult<&str, Instruction> {
             space1,
             complete::u8,
             space1,
-            delimited(complete::char('('), parse_color, complete::char(')')),
+            delimited(
+                complete::char('('),
+                parse_alt_instruction,
+                complete::char(')'),
+            ),
         )),
-        |(direction, _, amount, _, color)| Instruction {
+        |(direction, _, distance, _, alt_instruction)| Instruction {
             direction,
-            amount,
-            color,
+            distance,
+            alt: alt_instruction,
         },
     )(input)
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
 struct Bounds {
-    min: i64,
-    max: i64,
+    min: isize,
+    max: isize,
 }
 
 impl Bounds {
-    fn apply(self, num: i64) -> Self {
+    fn apply(self, num: isize) -> Self {
         Bounds {
             min: min(self.min, num),
             max: max(self.max, num),
@@ -107,13 +124,13 @@ struct Instructions(Vec<Instruction>);
 
 impl Instructions {
     fn get_width_bounds(&self) -> Bounds {
-        let mut width = 0_i64;
+        let mut width = 0_isize;
         self.iter()
             .filter_map(|instruction| match instruction.direction {
                 Up => None,
                 Down => None,
-                Left => Some(0 - (instruction.amount as i64)),
-                Right => Some(instruction.amount as i64),
+                Left => Some(0 - (instruction.distance as isize)),
+                Right => Some(instruction.distance as isize),
             })
             .fold(Bounds::default(), |bounds: Bounds, num| {
                 width += num;
@@ -122,11 +139,41 @@ impl Instructions {
     }
 
     fn get_height_bounds(&self) -> Bounds {
-        let mut height = 0_i64;
+        let mut height = 0_isize;
         self.iter()
             .filter_map(|instruction| match instruction.direction {
-                Up => Some(0 - (instruction.amount as i64)),
-                Down => Some(instruction.amount as i64),
+                Up => Some(0 - (instruction.distance as isize)),
+                Down => Some(instruction.distance as isize),
+                Left => None,
+                Right => None,
+            })
+            .fold(Bounds::default(), |bounds: Bounds, num| {
+                height += num;
+                bounds.apply(height)
+            })
+    }
+
+    fn get_width_bounds_alt(&self) -> Bounds {
+        let mut width = 0_isize;
+        self.iter()
+            .filter_map(|instruction| match instruction.alt.direction {
+                Up => None,
+                Down => None,
+                Left => Some(0 - (instruction.alt.distance as isize)),
+                Right => Some(instruction.alt.distance as isize),
+            })
+            .fold(Bounds::default(), |bounds: Bounds, num| {
+                width += num;
+                bounds.apply(width)
+            })
+    }
+
+    fn get_height_bounds_alt(&self) -> Bounds {
+        let mut height = 0_isize;
+        self.iter()
+            .filter_map(|instruction| match instruction.alt.direction {
+                Up => Some(0 - (instruction.alt.distance as isize)),
+                Down => Some(instruction.alt.distance as isize),
                 Left => None,
                 Right => None,
             })
@@ -147,11 +194,6 @@ fn parse_instructions(input: &str) -> IResult<&str, Instructions> {
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 struct Tile {
     is_dug: bool,
-    color: Option<Color>,
-    // edge_horizontal: bool,
-    // edge_vertical: bool,
-    // edge_left: bool,
-    // edge_right: bool,
 }
 
 #[derive(Debug, Clone, Deref, DerefMut)]
@@ -163,6 +205,20 @@ struct Grid {
 }
 
 impl Grid {
+    fn from(instructions: &Instructions) -> Self {
+        let height = instructions.get_height_bounds();
+        let width = instructions.get_width_bounds();
+
+        Grid::with_bounds(height, width)
+    }
+
+    fn from_alt(instructions: &Instructions) -> Self {
+        let height = instructions.get_height_bounds_alt();
+        let width = instructions.get_width_bounds_alt();
+
+        Grid::with_bounds(height, width)
+    }
+
     fn with_bounds(height: Bounds, width: Bounds) -> Self {
         let initial_start = Pos {
             row: abs(height.min) as usize,
@@ -186,20 +242,28 @@ impl Grid {
         self[0].len()
     }
 
-    fn dig_at(&mut self, pos: Pos, color: Option<Color>) {
+    fn dig_at(&mut self, pos: Pos) {
         self[pos.row][pos.col].is_dug = true;
-        if color.is_some() {
-            self[pos.row][pos.col].color = color
-        }
     }
 
     fn dig_trench(&mut self, instructions: &[Instruction]) {
         let mut pos = self.initial_start;
-        self.dig_at(pos, Some(instructions.first().unwrap().color));
+        self.dig_at(pos);
         instructions.iter().for_each(|instruction| {
-            for _ in 0..instruction.amount {
+            for _ in 0..instruction.distance {
                 pos = pos + instruction.direction;
-                self.dig_at(pos, Some(instruction.color))
+                self.dig_at(pos)
+            }
+        })
+    }
+
+    fn dig_trench_alt(&mut self, instructions: &[Instruction]) {
+        let mut pos = self.initial_start;
+        self.dig_at(pos);
+        instructions.iter().for_each(|instruction| {
+            for _ in 0..instruction.alt.distance {
+                pos = pos + instruction.alt.direction;
+                self.dig_at(pos)
             }
         })
     }
@@ -296,15 +360,6 @@ impl Grid {
     }
 }
 
-impl From<&Instructions> for Grid {
-    fn from(instructions: &Instructions) -> Self {
-        let height = instructions.get_height_bounds();
-        let width = instructions.get_width_bounds();
-
-        Grid::with_bounds(height, width)
-    }
-}
-
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
 struct Pos {
     row: usize,
@@ -374,8 +429,12 @@ pub fn part1(input: &str) -> String {
     grid.count_holes().to_string()
 }
 
-pub fn part2(_input: &str) -> String {
-    todo!()
+pub fn part2(input: &str) -> String {
+    let instructions = parse_instructions(input).unwrap().1;
+    let mut grid = Grid::from_alt(&instructions);
+    grid.dig_trench_alt(&instructions);
+    grid.fill_trench();
+    grid.count_holes().to_string()
 }
 
 #[cfg(test)]
@@ -403,20 +462,19 @@ mod test {
         }
     }
 
-    mod color {
+    mod alt_instruction {
         use super::*;
 
         #[test]
         fn test_parse_color() {
-            let input = "#fFc864"; // intentional case change
+            let input = "#332211"; // intentional case change
             assert_eq!(
-                parse_color(input),
+                parse_alt_instruction(input),
                 Ok((
                     "",
-                    Color {
-                        red: 255,
-                        green: 200,
-                        blue: 100,
+                    AltInstruction {
+                        direction: Down,
+                        distance: 209441,
                     }
                 ))
             );
@@ -434,11 +492,10 @@ mod test {
                 instruction,
                 Instruction {
                     direction: Left,
-                    amount: 2,
-                    color: Color {
-                        red: 0,
-                        green: 42,
-                        blue: 34,
+                    distance: 2,
+                    alt: AltInstruction {
+                        direction: Left,
+                        distance: 674,
                     },
                 }
             )
@@ -537,10 +594,23 @@ U 2 (#7a21e3)
         assert_eq!(part1(input), "62");
     }
 
-    #[ignore]
     #[test]
     fn test_part2() {
-        let input = "";
-        assert_eq!(part2(input), "");
+        let input = "R 6 (#70c710)
+D 5 (#0dc571)
+L 2 (#5713f0)
+D 2 (#d2c081)
+R 2 (#59c680)
+D 2 (#411b91)
+L 5 (#8ceee2)
+U 2 (#caa173)
+L 1 (#1b58a2)
+U 2 (#caa171)
+R 2 (#7807d2)
+U 3 (#a77fa3)
+L 2 (#015232)
+U 2 (#7a21e3)
+";
+        assert_eq!(part2(input), "952408144115");
     }
 }
