@@ -49,3 +49,5 @@ Completed Tasks:
 - Day 14 ⭐️⭐️
 - Day 15 ⭐️⭐️
 - Day 16 ⭐️⭐️
+- Day 17
+- Day 18 ⭐️
