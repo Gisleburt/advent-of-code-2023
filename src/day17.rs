@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::ops::Add;
 
 use derive_more::{Deref, DerefMut, From};
@@ -214,12 +213,10 @@ impl Node {
     fn find_child(&mut self, child: &Node) -> Option<&mut Node> {
         if self == child {
             Some(self)
+        } else if let Some(children) = self.children.as_mut() {
+            children.iter_mut().find(|node| node == &child)
         } else {
-            if let Some(children) = self.children.as_mut() {
-                children.iter_mut().find(|node| node == &child)
-            } else {
-                None
-            }
+            None
         }
     }
 

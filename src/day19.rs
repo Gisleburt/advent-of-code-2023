@@ -1,4 +1,6 @@
-use derive_more::{Deref, From};
+use std::collections::HashMap;
+
+use derive_more::{Deref, DerefMut, From};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete;
@@ -11,6 +13,8 @@ use nom::IResult;
 use Category::*;
 use Outcome::*;
 use RuleType::*;
+
+use crate::day19::MetaOutcome::{MetaAccepted, MetaContinueTo, MetaRejected};
 
 #[derive(Debug, Clone, PartialEq)]
 enum Outcome {
@@ -27,7 +31,26 @@ fn parse_outcome(input: &str) -> IResult<&str, Outcome> {
     ))(input)
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+enum MetaOutcome {
+    MetaAccepted {
+        accepted_part: MetaPart,
+        remainder: Option<MetaPart>,
+    },
+    MetaRejected {
+        rejected_part: MetaPart,
+        remainder: Option<MetaPart>,
+    },
+    MetaContinueTo {
+        continue_to: String,
+        continue_part: MetaPart,
+        remainder: Option<MetaPart>,
+    },
+    NoOutcome {
+        remainder: MetaPart,
+    },
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 enum Category {
     Cool,
     Musical,
@@ -122,6 +145,58 @@ impl Workflow {
             })
             .unwrap_or_else(|| panic!("Workflow {self:?} did not match part {part:?}"))
     }
+
+    fn process_meta_part(&self, part: MetaPart) -> Vec<MetaWorkflowInstruction> {
+        let mut next_to_process = Some(part);
+        let mut processed = vec![];
+
+        for rule_or_outcome in &self.rules {
+            if let Some(next) = next_to_process.take() {
+                match rule_or_outcome {
+                    RuleOrOutcome::Rule(rule) => match next.apply_rule(rule) {
+                        MetaAccepted {
+                            accepted_part,
+                            remainder,
+                        } => {
+                            processed.push(MetaWorkflowInstruction {
+                                part: accepted_part,
+                                outcome: Accepted,
+                            });
+                            next_to_process = remainder
+                        }
+                        MetaRejected {
+                            rejected_part,
+                            remainder,
+                        } => {
+                            processed.push(MetaWorkflowInstruction {
+                                part: rejected_part,
+                                outcome: Accepted,
+                            });
+                            next_to_process = remainder
+                        }
+                        MetaContinueTo {
+                            continue_to,
+                            continue_part,
+                            remainder,
+                        } => {
+                            processed.push(MetaWorkflowInstruction {
+                                part: continue_part,
+                                outcome: ContinueTo(continue_to),
+                            });
+                            next_to_process = remainder
+                        }
+                        MetaOutcome::NoOutcome { remainder } => next_to_process = Some(remainder),
+                    },
+                    RuleOrOutcome::Outcome(outcome) => processed.push(MetaWorkflowInstruction {
+                        part: next.clone(),
+                        outcome: outcome.clone(),
+                    }),
+                }
+            }
+        }
+
+        processed
+    }
 }
 
 fn parse_workflow(input: &str) -> IResult<&str, Workflow> {
@@ -152,6 +227,19 @@ impl Workflows {
             .unwrap_or_else(|| panic!("Could not find {label}"));
         workflow.process_part(part)
     }
+
+    fn process_meta_part(&self, part: MetaPart, label: &str) -> Vec<MetaWorkflowInstruction> {
+        let workflow = self
+            .iter()
+            .find(|workflow| workflow.label == label)
+            .unwrap_or_else(|| panic!("Could not find {label}"));
+        workflow.process_meta_part(part)
+    }
+}
+
+struct MetaWorkflowInstruction {
+    part: MetaPart,
+    outcome: Outcome,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -174,6 +262,127 @@ impl Part {
 
     fn total_value(&self) -> u64 {
         self.x + self.m + self.a + self.s
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct MetaRange {
+    start: u64,
+    end: u64,
+}
+
+impl MetaRange {
+    fn new(start: u64, end: u64) -> Self {
+        Self { start, end }
+    }
+
+    fn split_on(&self, rule_type: RuleType, value: u64) -> Option<(MetaRange, Option<MetaRange>)> {
+        match rule_type {
+            GreaterThan => {
+                if value < self.start {
+                    Some((*self, None))
+                } else if value < self.end {
+                    Some((
+                        MetaRange {
+                            start: value + 1,
+                            end: self.end,
+                        },
+                        Some(MetaRange {
+                            start: self.start,
+                            end: value,
+                        }),
+                    ))
+                } else {
+                    None
+                }
+            }
+            LessThan => {
+                if value > self.end {
+                    Some((*self, None))
+                } else if value > self.start {
+                    Some((
+                        MetaRange {
+                            start: self.start,
+                            end: value - 1,
+                        },
+                        Some(MetaRange {
+                            start: value,
+                            end: self.end,
+                        }),
+                    ))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn value(&self) -> u64 {
+        (self.start..=self.end).into_iter().sum()
+    }
+}
+
+impl Default for MetaRange {
+    fn default() -> Self {
+        Self {
+            start: 1,
+            end: 4000,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut)]
+struct MetaPart(HashMap<Category, MetaRange>);
+
+impl MetaPart {
+    fn new() -> Self {
+        Self(HashMap::from([
+            (Cool, MetaRange::default()),
+            (Musical, MetaRange::default()),
+            (Aerodynamic, MetaRange::default()),
+            (Shiny, MetaRange::default()),
+        ]))
+    }
+
+    fn replace_quantity(mut self, category: &Category, range: MetaRange) -> Self {
+        *self.get_mut(category).unwrap() = range;
+        self
+    }
+
+    fn apply_rule(&self, rule: &Rule) -> MetaOutcome {
+        let range = self.get(&rule.category).unwrap();
+
+        if let Some((inclusive, exclusive)) = range.split_on(rule.rule_type, rule.value) {
+            match &rule.outcome {
+                Accepted => MetaAccepted {
+                    accepted_part: self.clone().replace_quantity(&rule.category, inclusive),
+                    remainder: exclusive
+                        .map(|exclusive| self.clone().replace_quantity(&rule.category, exclusive)),
+                },
+                Rejected => MetaRejected {
+                    rejected_part: self.clone().replace_quantity(&rule.category, inclusive),
+                    remainder: exclusive
+                        .map(|exclusive| self.clone().replace_quantity(&rule.category, exclusive)),
+                },
+                ContinueTo(label) => MetaContinueTo {
+                    continue_to: label.clone(),
+                    continue_part: self.clone().replace_quantity(&rule.category, inclusive),
+                    remainder: exclusive
+                        .map(|exclusive| self.clone().replace_quantity(&rule.category, exclusive)),
+                },
+            }
+        } else {
+            MetaOutcome::NoOutcome {
+                remainder: self.clone(),
+            }
+        }
+    }
+
+    fn total_value(&self) -> u64 {
+        self.get(&Cool).unwrap().value()
+            + self.get(&Musical).unwrap().value()
+            + self.get(&Aerodynamic).unwrap().value()
+            + self.get(&Shiny).unwrap().value()
     }
 }
 
@@ -227,8 +436,30 @@ pub fn part1(input: &str) -> String {
         .to_string()
 }
 
-pub fn part2(_input: &str) -> String {
-    todo!()
+pub fn part2(input: &str) -> String {
+    // Could make a parser for workflows but meh
+    let (workflows, _) = parse_input(input).unwrap().1;
+    let mut queue = vec![MetaWorkflowInstruction {
+        part: MetaPart::new(),
+        outcome: ContinueTo("in".to_string()),
+    }];
+    let mut accepted: Vec<MetaPart> = vec![];
+
+    while let Some(instruction) = queue.pop() {
+        match instruction.outcome {
+            Accepted => accepted.push(instruction.part),
+            Rejected => {}
+            ContinueTo(label) => {
+                queue.extend(workflows.process_meta_part(instruction.part, &label))
+            }
+        }
+    }
+
+    accepted
+        .into_iter()
+        .map(|part| part.total_value())
+        .sum::<u64>()
+        .to_string()
 }
 
 #[cfg(test)]
@@ -269,6 +500,21 @@ mod test {
                     ],
                 }
             )
+        }
+    }
+
+    mod meta_part {
+        use super::*;
+
+        #[test]
+        fn test_total_value() {
+            let part = MetaPart(HashMap::from([
+                (Cool, MetaRange::new(2, 3)),        // 2 + 3
+                (Musical, MetaRange::new(4, 6)),     // + 4 + 5 + 6
+                (Aerodynamic, MetaRange::new(1, 1)), // + 1
+                (Shiny, MetaRange::new(10, 13)),     // + 10 + 11 + 12 + 13
+            ]));
+            assert_eq!(part.total_value(), 67)
         }
     }
 
@@ -313,10 +559,25 @@ hdj{m>838:A,pv}
         assert_eq!(part1(input), "19114");
     }
 
-    #[ignore]
     #[test]
     fn test_part2() {
-        let input = "";
-        assert_eq!(part2(input), "");
+        let input = "px{a<2006:qkq,m>2090:A,rfg}
+pv{a>1716:R,A}
+lnx{m>1548:A,A}
+rfg{s<537:gd,x>2440:R,A}
+qs{s>3448:A,lnx}
+qkq{x<1416:A,crn}
+crn{x>2662:A,R}
+in{s<1351:px,qqz}
+qqz{s>2770:qs,m<1801:hdj,R}
+gd{a>3333:R,R}
+hdj{m>838:A,pv}
+
+{x=787,m=2655,a=1222,s=2876}
+{x=1679,m=44,a=2067,s=496}
+{x=2036,m=264,a=79,s=2244}
+{x=2461,m=1339,a=466,s=291}
+{x=2127,m=1623,a=2188,s=1013}";
+        assert_eq!(part2(input), "167409079868000");
     }
 }
