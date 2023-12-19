@@ -11,10 +11,9 @@ use nom::sequence::{delimited, pair, preceded, separated_pair, tuple};
 use nom::IResult;
 
 use Category::*;
+use MetaOutcome::*;
 use Outcome::*;
 use RuleType::*;
-
-use crate::day19::MetaOutcome::{MetaAccepted, MetaContinueTo, MetaRejected};
 
 #[derive(Debug, Clone, PartialEq)]
 enum Outcome {
@@ -272,53 +271,58 @@ struct MetaRange {
 }
 
 impl MetaRange {
+    #[cfg(test)]
     fn new(start: u64, end: u64) -> Self {
         Self { start, end }
     }
 
     fn split_on(&self, rule_type: RuleType, value: u64) -> Option<(MetaRange, Option<MetaRange>)> {
         match rule_type {
-            GreaterThan => {
-                if value < self.start {
-                    Some((*self, None))
-                } else if value < self.end {
-                    Some((
-                        MetaRange {
-                            start: value + 1,
-                            end: self.end,
-                        },
-                        Some(MetaRange {
-                            start: self.start,
-                            end: value,
-                        }),
-                    ))
-                } else {
-                    None
-                }
-            }
-            LessThan => {
-                if value > self.end {
-                    Some((*self, None))
-                } else if value > self.start {
-                    Some((
-                        MetaRange {
-                            start: self.start,
-                            end: value - 1,
-                        },
-                        Some(MetaRange {
-                            start: value,
-                            end: self.end,
-                        }),
-                    ))
-                } else {
-                    None
-                }
-            }
+            GreaterThan => self.split_greater_than(value),
+            LessThan => self.split_less_than(value),
         }
     }
 
-    fn value(&self) -> u64 {
-        (self.start..=self.end).into_iter().sum()
+    fn split_less_than(&self, value: u64) -> Option<(MetaRange, Option<MetaRange>)> {
+        if value > self.end {
+            Some((*self, None))
+        } else if value > self.start {
+            Some((
+                MetaRange {
+                    start: self.start,
+                    end: value - 1,
+                },
+                Some(MetaRange {
+                    start: value,
+                    end: self.end,
+                }),
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn split_greater_than(&self, value: u64) -> Option<(MetaRange, Option<MetaRange>)> {
+        if value < self.start {
+            Some((*self, None))
+        } else if value < self.end {
+            Some((
+                MetaRange {
+                    start: value + 1,
+                    end: self.end,
+                },
+                Some(MetaRange {
+                    start: self.start,
+                    end: value,
+                }),
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn len(&self) -> u64 {
+        1 + self.end - self.start
     }
 }
 
@@ -372,17 +376,17 @@ impl MetaPart {
                 },
             }
         } else {
-            MetaOutcome::NoOutcome {
+            NoOutcome {
                 remainder: self.clone(),
             }
         }
     }
 
-    fn total_value(&self) -> u64 {
-        self.get(&Cool).unwrap().value()
-            + self.get(&Musical).unwrap().value()
-            + self.get(&Aerodynamic).unwrap().value()
-            + self.get(&Shiny).unwrap().value()
+    fn possible_ranges(&self) -> u64 {
+        self.get(&Cool).unwrap().len()
+            * self.get(&Musical).unwrap().len()
+            * self.get(&Aerodynamic).unwrap().len()
+            * self.get(&Shiny).unwrap().len()
     }
 }
 
@@ -457,7 +461,7 @@ pub fn part2(input: &str) -> String {
 
     accepted
         .into_iter()
-        .map(|part| part.total_value())
+        .map(|part| part.possible_ranges())
         .sum::<u64>()
         .to_string()
 }
@@ -509,12 +513,12 @@ mod test {
         #[test]
         fn test_total_value() {
             let part = MetaPart(HashMap::from([
-                (Cool, MetaRange::new(2, 3)),        // 2 + 3
-                (Musical, MetaRange::new(4, 6)),     // + 4 + 5 + 6
-                (Aerodynamic, MetaRange::new(1, 1)), // + 1
-                (Shiny, MetaRange::new(10, 13)),     // + 10 + 11 + 12 + 13
+                (Cool, MetaRange::new(2, 3)),        // 2 + 3 = 2
+                (Musical, MetaRange::new(4, 6)),     // 4 + 5 + 6 = 3
+                (Aerodynamic, MetaRange::new(1, 1)), // 1 = 1
+                (Shiny, MetaRange::new(10, 13)),     // 10 + 11 + 12 + 13 = 4
             ]));
-            assert_eq!(part.total_value(), 67)
+            assert_eq!(part.possible_ranges(), 2 * 3 * 1 * 4)
         }
     }
 
