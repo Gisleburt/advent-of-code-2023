@@ -52,7 +52,7 @@ fn from_hex(input: &str) -> Result<u64, std::num::ParseIntError> {
 }
 
 fn is_hex_digit(c: char) -> bool {
-    c.is_digit(16)
+    c.is_ascii_hexdigit()
 }
 
 fn parse_distance_alt(input: &str) -> IResult<&str, u64> {
@@ -337,13 +337,12 @@ impl Grid {
         let to_dig = self
             .iter()
             .enumerate()
-            .map(|(row, tiles)| {
+            .flat_map(|(row, tiles)| {
                 tiles
                     .iter()
                     .enumerate()
                     .map(move |(col, tile)| (Pos { row, col }, tile))
             })
-            .flatten()
             .filter_map(|(pos, tile)| (!tile.is_dug).then_some(pos))
             .filter(|pos| self.point_is_definitely_inside_trench(*pos))
             .collect_vec();
