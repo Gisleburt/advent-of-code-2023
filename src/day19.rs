@@ -169,7 +169,7 @@ impl Workflow {
                         } => {
                             processed.push(MetaWorkflowInstruction {
                                 part: rejected_part,
-                                outcome: Accepted,
+                                outcome: Rejected,
                             });
                             next_to_process = remainder
                         }
