@@ -198,7 +198,7 @@ impl Modules {
             .find(|module| module.get_label() == message.to)
             .map(|module| module.process_message(message.clone()))
             .unwrap_or_else(|| {
-                eprintln!("unable to find module {}", message.to);
+                // eprintln!("unable to find module {}", message.to);
                 vec![]
             })
     }
@@ -238,6 +238,30 @@ impl Communications {
             let messages = self.modules.process_message(message);
             self.message_queue.extend(messages);
         }
+    }
+
+    fn push_button2(&mut self) -> bool {
+        self.message_queue.push_back(Message {
+            to: "broadcaster".to_string(),
+            from: "button".to_string(),
+            pulse: Low,
+        });
+
+        while let Some(message) = self.message_queue.pop_front() {
+            match message.pulse {
+                High => self.high_counter = self.high_counter + 1,
+                Low => self.low_counter = self.low_counter + 1,
+            }
+
+            if &message.to == "rx" && message.pulse == Low {
+                return true;
+            }
+
+            let messages = self.modules.process_message(message);
+            self.message_queue.extend(messages);
+        }
+
+        false
     }
 
     fn value(&self) -> usize {
@@ -317,8 +341,17 @@ pub fn part1(input: &str) -> String {
     communications.value().to_string()
 }
 
-pub fn part2(_input: &str) -> String {
-    todo!()
+pub fn part2(input: &str) -> String {
+    let modules = parse_modules(input).unwrap().1;
+    let mut communications = Communications::new(modules);
+    let mut count = 0;
+    for i in 1usize.. {
+        count = i;
+        if communications.push_button2() {
+            break;
+        }
+    }
+    count.to_string()
 }
 
 #[cfg(test)]
