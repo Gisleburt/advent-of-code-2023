@@ -166,20 +166,30 @@ impl Map {
             col: start.col as isize,
         };
         let mut queue: Vec<BigPos> = vec![start];
+        let mut could_end_here: Vec<BigPos> = vec![];
+        let steps_mod_2 = steps % 2;
 
-        for _ in 0..steps {
+        for step in 1..=steps {
+            let could_end_this_tile = step % 2 == steps_mod_2;
+
             let mut temp = vec![];
             while let Some(pos) = queue.pop() {
                 temp.append(&mut pos.adjacent())
             }
-            queue.extend(
-                temp.into_iter()
-                    .filter(|pos| self.is_not_rock_infinite(*pos))
-                    .unique(),
-            )
+
+            let mut tiles = temp
+                .into_iter()
+                .filter(|pos| self.is_not_rock_infinite(*pos))
+                .filter(|pos| !could_end_this_tile || !could_end_here.contains(pos))
+                .unique()
+                .collect_vec();
+            if could_end_this_tile {
+                could_end_here.extend(tiles.iter())
+            }
+            queue.append(&mut tiles)
         }
 
-        queue.len()
+        could_end_here.len()
     }
 }
 
