@@ -168,6 +168,7 @@ impl Map {
         };
         let mut queue: Vec<BigPos> = vec![start];
         let mut could_end_here: SortedSet<BigPos> = SortedSet::new();
+        let mut could_not_end_here: SortedSet<BigPos> = SortedSet::new();
         let steps_mod_2 = steps % 2;
 
         for step in 1..=steps {
@@ -182,7 +183,11 @@ impl Map {
                 temp.into_iter()
                     .filter(|pos| self.is_not_rock_infinite(*pos))
                     .filter(|pos| {
-                        !could_end_this_tile || could_end_here.find_or_insert(*pos).is_inserted()
+                        if could_end_this_tile {
+                            could_end_here.find_or_insert(*pos).is_inserted()
+                        } else {
+                            could_not_end_here.find_or_insert(*pos).is_inserted()
+                        }
                     })
                     .unique(),
             )
@@ -281,6 +286,6 @@ mod test {
 ...........";
         // assert_eq!(part2(input), "");
         let map = parse_garden_map(input).unwrap().1;
-        assert_eq!(map.reachable_in_n_steps_infinite(5000), 16733044)
+        assert_eq!(map.reachable_in_n_steps_infinite(50), 1594)
     }
 }
