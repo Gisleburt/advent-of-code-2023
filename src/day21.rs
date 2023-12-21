@@ -6,6 +6,7 @@ use nom::character::complete::newline;
 use nom::combinator::{into, value};
 use nom::multi::{many1, separated_list1};
 use nom::IResult;
+use sorted_vec::SortedSet;
 
 use GardenFeature::*;
 
@@ -57,7 +58,7 @@ impl Pos {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct BigPos {
     row: isize,
     col: isize,
@@ -166,7 +167,7 @@ impl Map {
             col: start.col as isize,
         };
         let mut queue: Vec<BigPos> = vec![start];
-        let mut could_end_here: Vec<BigPos> = vec![];
+        let mut could_end_here: SortedSet<BigPos> = SortedSet::new();
         let steps_mod_2 = steps % 2;
 
         for step in 1..=steps {
@@ -177,16 +178,14 @@ impl Map {
                 temp.append(&mut pos.adjacent())
             }
 
-            let mut tiles = temp
-                .into_iter()
-                .filter(|pos| self.is_not_rock_infinite(*pos))
-                .filter(|pos| !could_end_this_tile || !could_end_here.contains(pos))
-                .unique()
-                .collect_vec();
-            if could_end_this_tile {
-                could_end_here.extend(tiles.iter())
-            }
-            queue.append(&mut tiles)
+            queue.extend(
+                temp.into_iter()
+                    .filter(|pos| self.is_not_rock_infinite(*pos))
+                    .filter(|pos| {
+                        !could_end_this_tile || could_end_here.find_or_insert(*pos).is_inserted()
+                    })
+                    .unique(),
+            )
         }
 
         could_end_here.len()
@@ -282,6 +281,6 @@ mod test {
 ...........";
         // assert_eq!(part2(input), "");
         let map = parse_garden_map(input).unwrap().1;
-        assert_eq!(map.reachable_in_n_steps_infinite(50), 1594)
+        assert_eq!(map.reachable_in_n_steps_infinite(5000), 16733044)
     }
 }
