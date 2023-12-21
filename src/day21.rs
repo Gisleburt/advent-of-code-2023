@@ -57,6 +57,46 @@ impl Pos {
     }
 }
 
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+struct BigPos {
+    row: isize,
+    col: isize,
+}
+
+impl BigPos {
+    fn up(&self) -> Self {
+        BigPos {
+            row: self.row - 1,
+            col: self.col,
+        }
+    }
+
+    fn down(&self) -> Self {
+        BigPos {
+            row: self.row + 1,
+            col: self.col,
+        }
+    }
+
+    fn left(&self) -> Self {
+        BigPos {
+            row: self.row,
+            col: self.col - 1,
+        }
+    }
+
+    fn right(&self) -> Self {
+        BigPos {
+            row: self.row,
+            col: self.col + 1,
+        }
+    }
+
+    fn adjacent(&self) -> Vec<BigPos> {
+        vec![self.up(), self.down(), self.left(), self.right()]
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum GardenFeature {
     Start,
@@ -92,6 +132,14 @@ impl Map {
         self[pos.row][pos.col] != Rock
     }
 
+    fn is_not_rock_infinite(&self, pos: BigPos) -> bool {
+        let rows = self.rows() as isize;
+        let cols = self.cols() as isize;
+        let row = ((pos.row % rows) + rows) % rows;
+        let col = ((pos.col % cols) + cols) % cols;
+        self[row as usize][col as usize] != Rock
+    }
+
     fn reachable_in_n_steps(&self, steps: usize) -> usize {
         let start = self.get_start_pos();
         let mut queue: Vec<Pos> = vec![start];
@@ -104,6 +152,29 @@ impl Map {
             queue.extend(
                 temp.into_iter()
                     .filter(|pos| self.is_not_rock(*pos))
+                    .unique(),
+            )
+        }
+
+        queue.len()
+    }
+
+    fn reachable_in_n_steps_infinite(&self, steps: usize) -> usize {
+        let start = self.get_start_pos();
+        let start = BigPos {
+            row: start.row as isize,
+            col: start.col as isize,
+        };
+        let mut queue: Vec<BigPos> = vec![start];
+
+        for _ in 0..steps {
+            let mut temp = vec![];
+            while let Some(pos) = queue.pop() {
+                temp.append(&mut pos.adjacent())
+            }
+            queue.extend(
+                temp.into_iter()
+                    .filter(|pos| self.is_not_rock_infinite(*pos))
                     .unique(),
             )
         }
@@ -129,8 +200,9 @@ pub fn part1(input: &str) -> String {
     map.reachable_in_n_steps(64).to_string()
 }
 
-pub fn part2(_input: &str) -> String {
-    todo!()
+pub fn part2(input: &str) -> String {
+    let map = parse_garden_map(input).unwrap().1;
+    map.reachable_in_n_steps_infinite(26501365).to_string()
 }
 
 #[cfg(test)]
@@ -185,10 +257,21 @@ mod test {
         assert_eq!(map.reachable_in_n_steps(6), 16)
     }
 
-    #[ignore]
     #[test]
     fn test_part2() {
-        let input = "";
-        assert_eq!(part2(input), "");
+        let input = "...........
+.....###.#.
+.###.##..#.
+..#.#...#..
+....#.#....
+.##..S####.
+.##..#...#.
+.......##..
+.##.#.####.
+.##..##.##.
+...........";
+        // assert_eq!(part2(input), "");
+        let map = parse_garden_map(input).unwrap().1;
+        assert_eq!(map.reachable_in_n_steps_infinite(50), 1594)
     }
 }
