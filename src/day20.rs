@@ -120,6 +120,7 @@ enum Module {
 }
 
 impl Module {
+    #[cfg(test)]
     fn broadcaster(&mut self) -> Option<&mut Broadcaster> {
         match self {
             Module::Broadcaster(module) => Some(module),
@@ -127,6 +128,7 @@ impl Module {
         }
     }
 
+    #[cfg(test)]
     fn flip_flop(&mut self) -> Option<&mut FlipFlop> {
         match self {
             Module::FlipFlop(module) => Some(module),
