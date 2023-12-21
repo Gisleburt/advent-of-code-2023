@@ -53,7 +53,7 @@ Completed Tasks:
 - Day 18 ⭐️❌ - part 2 won't work with fill due to excessive heap usage
 - Day 19 ⭐️⭐️
 - Day 20 ⭐️
-- Day 21
+- Day 21 ⭐️
 - Day 22
 - Day 23
 - Day 24
