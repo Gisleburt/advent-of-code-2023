@@ -78,7 +78,7 @@ impl Brick {
         self.lowest_point() == other.highest_point() + 1 && self.footprint_overlaps(other)
     }
 
-    fn held_by(&self, bricks: &Bricks) -> Vec<Brick> {
+    fn held_by(&self, bricks: &[Brick]) -> Vec<Brick> {
         bricks
             .iter()
             .filter(|other| self.is_resting_on(other))
@@ -86,7 +86,7 @@ impl Brick {
             .collect()
     }
 
-    fn held_by_only(&self, bricks: &Bricks, other: &Brick) -> bool {
+    fn held_by_only(&self, bricks: &[Brick], other: &Brick) -> bool {
         let held_by = self.held_by(bricks);
         held_by.contains(other) && held_by.len() == 1
     }
@@ -106,11 +106,12 @@ impl Bricks {
             let mut current_brick = *self.get(i).unwrap();
             let mut bricks_below = self[0..i].iter().rev();
             let new_z = bricks_below
-                .find_map(|other| {
+                .filter_map(|other| {
                     current_brick
                         .footprint_overlaps(other)
                         .then_some(other.highest_point() + 1)
                 })
+                .max()
                 .unwrap_or(1);
             self.get_mut(i).map(|brick| brick.move_down_to(new_z));
         }
@@ -264,7 +265,243 @@ mod test {
         use super::*;
 
         #[test]
-        fn test_lowest_point() {}
+        fn test_lowest_point() {
+            let brick = Brick(
+                Coordinate { x: 2, y: 2, z: 3 },
+                Coordinate { x: 1, y: 3, z: 4 },
+            );
+            assert_eq!(brick.lowest_point(), 3);
+        }
+
+        #[test]
+        fn test_highest_point() {
+            let brick = Brick(
+                Coordinate { x: 2, y: 2, z: 3 },
+                Coordinate { x: 1, y: 3, z: 4 },
+            );
+            assert_eq!(brick.highest_point(), 4);
+        }
+
+        #[test]
+        fn test_is_resting_on() {
+            let test_brick = Brick(
+                Coordinate { x: 1, y: 1, z: 3 },
+                Coordinate { x: 2, y: 2, z: 3 },
+            );
+            let resting_on_1 = Brick(
+                Coordinate { x: 0, y: 0, z: 2 },
+                Coordinate { x: 1, y: 1, z: 2 },
+            );
+            let resting_on_2 = Brick(
+                Coordinate { x: 2, y: 2, z: 2 },
+                Coordinate { x: 3, y: 3, z: 2 },
+            );
+            let below = Brick(
+                Coordinate { x: 0, y: 0, z: 1 },
+                Coordinate { x: 1, y: 1, z: 1 },
+            );
+            let aside = Brick(
+                Coordinate { x: 4, y: 4, z: 2 },
+                Coordinate { x: 4, y: 4, z: 2 },
+            );
+            assert!(test_brick.is_resting_on(&resting_on_1));
+            assert!(test_brick.is_resting_on(&resting_on_2));
+            assert!(!test_brick.is_resting_on(&below));
+            assert!(!test_brick.is_resting_on(&aside));
+        }
+
+        #[test]
+        fn test_held_by() {
+            let test_brick = Brick(
+                Coordinate { x: 1, y: 1, z: 3 },
+                Coordinate { x: 2, y: 2, z: 3 },
+            );
+            let resting_on_1 = Brick(
+                Coordinate { x: 0, y: 0, z: 2 },
+                Coordinate { x: 1, y: 1, z: 2 },
+            );
+            let resting_on_2 = Brick(
+                Coordinate { x: 2, y: 2, z: 2 },
+                Coordinate { x: 3, y: 3, z: 2 },
+            );
+            let below = Brick(
+                Coordinate { x: 0, y: 0, z: 1 },
+                Coordinate { x: 1, y: 1, z: 1 },
+            );
+            let aside = Brick(
+                Coordinate { x: 4, y: 4, z: 2 },
+                Coordinate { x: 4, y: 4, z: 2 },
+            );
+            let bricks = [test_brick, resting_on_1, resting_on_2, below, aside];
+
+            assert_eq!(
+                test_brick.held_by(&bricks),
+                vec![resting_on_1, resting_on_2]
+            );
+        }
+
+        #[test]
+        fn test_held_by_only() {
+            let test_brick = Brick(
+                Coordinate { x: 1, y: 1, z: 3 },
+                Coordinate { x: 2, y: 2, z: 3 },
+            );
+            let resting_on_1 = Brick(
+                Coordinate { x: 0, y: 0, z: 2 },
+                Coordinate { x: 1, y: 1, z: 2 },
+            );
+            let resting_on_2 = Brick(
+                Coordinate { x: 2, y: 2, z: 2 },
+                Coordinate { x: 3, y: 3, z: 2 },
+            );
+            let below = Brick(
+                Coordinate { x: 0, y: 0, z: 1 },
+                Coordinate { x: 1, y: 1, z: 1 },
+            );
+            let aside = Brick(
+                Coordinate { x: 4, y: 4, z: 2 },
+                Coordinate { x: 4, y: 4, z: 2 },
+            );
+            let two_resting = [test_brick, resting_on_1, resting_on_2, below, aside];
+            let one_resting = [test_brick, resting_on_1, below, aside];
+
+            assert!(!test_brick.held_by_only(&two_resting, &resting_on_1));
+            assert!(test_brick.held_by_only(&one_resting, &resting_on_1));
+        }
+    }
+
+    mod bricks {
+        use super::*;
+
+        #[test]
+        fn test_sort() {
+            let mut bricks = Bricks(vec![
+                Brick(
+                    Coordinate { x: 1, y: 1, z: 3 },
+                    Coordinate { x: 2, y: 2, z: 10 },
+                ),
+                Brick(
+                    Coordinate { x: 1, y: 1, z: 1 },
+                    Coordinate { x: 2, y: 2, z: 4 },
+                ),
+            ]);
+            bricks.sort();
+            assert_eq!(
+                &bricks.0,
+                &[
+                    Brick(
+                        Coordinate { x: 1, y: 1, z: 1 },
+                        Coordinate { x: 2, y: 2, z: 4 },
+                    ),
+                    Brick(
+                        Coordinate { x: 1, y: 1, z: 3 },
+                        Coordinate { x: 2, y: 2, z: 10 },
+                    ),
+                ]
+            )
+        }
+
+        #[test]
+        fn test_collapse() {
+            // ======
+            // ||
+            // ||  =
+            // || ===
+            // Brick we want to drop
+            let perched_on_top = Brick(
+                Coordinate { x: 0, y: 0, z: 20 },
+                Coordinate { x: 0, y: 4, z: 20 },
+            );
+            // Low and flat
+            let low_and_flat = Brick(
+                Coordinate { x: 1, y: 1, z: 2 },
+                Coordinate { x: 1, y: 4, z: 2 },
+            );
+            // Sits on low and flat
+            let sits_on_low_and_flat = Brick(
+                Coordinate { x: 1, y: 2, z: 4 },
+                Coordinate { x: 1, y: 2, z: 4 },
+            );
+            // Is really tall but rests on ground
+            let really_tall = Brick(
+                Coordinate { x: 0, y: 0, z: 5 },
+                Coordinate { x: 0, y: 0, z: 10 },
+            );
+
+            let mut bricks = Bricks(vec![
+                perched_on_top,
+                low_and_flat,
+                sits_on_low_and_flat,
+                really_tall,
+            ]);
+            bricks.collapse();
+            assert_eq!(
+                &bricks.0,
+                &[
+                    // Low and flat
+                    Brick(
+                        Coordinate { x: 1, y: 1, z: 1 },
+                        Coordinate { x: 1, y: 4, z: 1 },
+                    ),
+                    // Sits on low and flat
+                    Brick(
+                        Coordinate { x: 1, y: 2, z: 2 },
+                        Coordinate { x: 1, y: 2, z: 2 },
+                    ),
+                    // Is really tall but rests on ground
+                    Brick(
+                        Coordinate { x: 0, y: 0, z: 1 },
+                        Coordinate { x: 0, y: 0, z: 6 },
+                    ),
+                    // Brick we want to drop
+                    Brick(
+                        Coordinate { x: 0, y: 0, z: 7 },
+                        Coordinate { x: 0, y: 4, z: 7 },
+                    ),
+                ]
+            )
+        }
+
+        #[test]
+        fn test_find_potentially_removable() {
+            // ======
+            // ||
+            // ||  =
+            // || ===
+            // Brick we want to drop
+            let perched_on_top = Brick(
+                Coordinate { x: 0, y: 0, z: 20 },
+                Coordinate { x: 0, y: 4, z: 20 },
+            );
+            // Low and flat
+            let low_and_flat = Brick(
+                Coordinate { x: 1, y: 1, z: 2 },
+                Coordinate { x: 1, y: 4, z: 2 },
+            );
+            // Sits on low and flat
+            let sits_on_low_and_flat = Brick(
+                Coordinate { x: 1, y: 2, z: 4 },
+                Coordinate { x: 1, y: 2, z: 4 },
+            );
+            // Is really tall but rests on ground
+            let really_tall = Brick(
+                Coordinate { x: 0, y: 0, z: 5 },
+                Coordinate { x: 0, y: 0, z: 10 },
+            );
+
+            let mut bricks = Bricks(vec![
+                perched_on_top,
+                low_and_flat,
+                sits_on_low_and_flat,
+                really_tall,
+            ]);
+            bricks.collapse();
+            // ======  <-
+            // ||
+            // ||  =   <-
+            // || ===
+            assert_eq!(bricks.find_potentially_removable().len(), 2);
+        }
     }
 
     #[test]
